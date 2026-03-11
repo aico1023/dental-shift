@@ -101,6 +101,49 @@ function renderStaffPanel() {
                 card.style.cursor = '';
                 card.addEventListener('dblclick', () => openStaffEditModal(s.id));
                 attachStaffDrag(card, s.id);
+
+                // --- ここからスタッフの並び替え用ドラッグ＆ドロップ設定 ---
+                // ※ drag.jsの attachStaffDrag は "copy"（シフト配置用）ですが、並び替えも同時にできるように判定を追加します。
+                card.addEventListener('dragenter', e => {
+                    e.preventDefault();
+                    if (e.dataTransfer.types.includes('text/plain')) { // staffIdを持っているか
+                        card.style.borderTop = '2px solid var(--accent)'; // ドロップ位置のハイライト
+                    }
+                });
+                card.addEventListener('dragover', e => {
+                    e.preventDefault(); // ドロップを許可
+                    e.dataTransfer.dropEffect = 'move';
+                });
+                card.addEventListener('dragleave', e => {
+                    card.style.borderTop = '';
+                });
+                card.addEventListener('drop', e => {
+                    e.preventDefault();
+                    e.stopPropagation(); // タイムライン等へのイベント伝播を防ぐ
+                    card.style.borderTop = '';
+
+                    const draggedStaffId = e.dataTransfer.getData('staffId');
+                    if (!draggedStaffId || draggedStaffId === String(s.id)) return;
+
+                    // 同じRoleの中でのみ入れ替え可能とする
+                    const draggedStaff = State.staff.find(st => String(st.id) === draggedStaffId);
+                    if (!draggedStaff || draggedStaff.role !== s.role) {
+                        showToast('warning', '並び替えエラー', '異なる職種のスタッフとは入れ替えられません。', 2000);
+                        return;
+                    }
+
+                    // 並び替え処理 (State.staff 内の順序を入れ替える)
+                    const fromIndex = State.staff.findIndex(st => String(st.id) === draggedStaffId);
+                    const toIndex = State.staff.findIndex(st => String(st.id) === String(s.id));
+
+                    if (fromIndex >= 0 && toIndex >= 0) {
+                        const [movedStaff] = State.staff.splice(fromIndex, 1);
+                        State.staff.splice(toIndex, 0, movedStaff);
+                        saveAll();
+                        renderStaffPanel(); // UIを即座に再描画
+                    }
+                });
+                // --- 並び替え用設定ここまで ---
             }
             section.appendChild(card);
         });

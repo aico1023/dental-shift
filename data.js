@@ -34,7 +34,7 @@ const DEFAULT_STAFF = [
 ];
 
 // ---- App State ----
-const TOTAL_UNITS = 11;
+let TOTAL_UNITS = 11;
 const State = {
   currentWeekStart: null,    // Date (Monday)
   currentWeekOffset: 0,      // weeks from reference
@@ -156,6 +156,7 @@ const LS_KEYS = {
   templates: 'dsa_templates',
   unitNames: 'dsa_unit_names',
   leave: 'dsa_leave',
+  totalUnits: 'dsa_total_units', // 追加: ユニット数
   syncMode: 'dsa_sync_mode',    // 'local' or 'cloud'
   syncUrl: 'dsa_sync_url',      // GAS Web App URL
 };
@@ -188,6 +189,7 @@ function saveAll() {
     localStorage.setItem(LS_KEYS.templates, JSON.stringify(State.templates));
     localStorage.setItem(LS_KEYS.unitNames, JSON.stringify(State.unitNames));
     localStorage.setItem(LS_KEYS.leave, JSON.stringify(State.leaveRecords));
+    localStorage.setItem(LS_KEYS.totalUnits, TOTAL_UNITS.toString());
 
     // クラウドモードの場合、GASにPOST送信
     if (isCloudSyncEnabled()) {
@@ -286,6 +288,8 @@ function _loadFromLocal() {
     State.unitNames = un ? JSON.parse(un) : {};
     const lv = localStorage.getItem(LS_KEYS.leave);
     State.leaveRecords = lv ? JSON.parse(lv) : {};
+    const tu = localStorage.getItem(LS_KEYS.totalUnits);
+    TOTAL_UNITS = tu ? parseInt(tu, 10) : 11;
   } catch (e) {
     State.staff = [...DEFAULT_STAFF];
     State.weekShifts = {};
@@ -293,6 +297,7 @@ function _loadFromLocal() {
     State.templates = {};
     State.unitNames = {};
     State.leaveRecords = {};
+    TOTAL_UNITS = 11;
   }
 }
 

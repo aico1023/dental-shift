@@ -7,7 +7,7 @@ function attachStaffDrag(card, staffId) {
     card.setAttribute('draggable', 'true');
     card.addEventListener('dragstart', e => {
         e.dataTransfer.setData('staffId', staffId);
-        e.dataTransfer.effectAllowed = 'copy';
+        e.dataTransfer.effectAllowed = 'copyMove'; // 配置と並び替えの両方に対応
         card.classList.add('dragging-source');
     });
     card.addEventListener('dragend', () => card.classList.remove('dragging-source'));

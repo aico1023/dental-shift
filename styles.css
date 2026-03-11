@@ -794,12 +794,6 @@ ol {
   pointer-events: none;
 }
 
-.unit-body {
-  flex: 1;
-  position: relative;
-  overflow: hidden;
-}
-
 /* Grid lines */
 .grid-line {
   position: absolute;

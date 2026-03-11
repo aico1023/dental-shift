@@ -4,31 +4,32 @@
 
 // TOTAL_UNITS は data.js で定義（= 11）
 
-// ユニット表示名取得（dayKey省略時は現在の曜日をデフォルトに使用）
-function getUnitName(u, dayKey) {
-    const dk = dayKey || currentDayKey();
-    return (State.unitNames[dk] && State.unitNames[dk][u])
-        ? State.unitNames[dk][u]
-        : `U${u}`;
+// ユニット表示名取得（一括設定に変更されたためdayKeyは無視して共通設定を読む）
+function getUnitName(u) {
+    if (!State.unitNames) State.unitNames = {};
+    return State.unitNames[u] || `U${u}`;
 }
 
-// ユニット名称変更（現在の曜日に保存）
+// ユニット名称変更（すべての日に共通の名称として保存）
 function renameUnit(u) {
-    const dk = currentDayKey();
-    const current = getUnitName(u, dk);
-    const newName = prompt(`U${u} の名称を入力してください（この曜日のみ変更されます）：`, current);
+    const current = getUnitName(u);
+    const newName = prompt(`U${u} の名称を入力してください（すべての曜日で一括変更されます）：`, current);
     if (newName === null) return;
     const trimmed = newName.trim();
     if (!trimmed) return;
-    if (!State.unitNames[dk]) State.unitNames[dk] = {};
-    State.unitNames[dk][u] = trimmed;
+
+    // 古いデータ構造（日ごとのキー 'YYYY-MM-DD...' や数値以外のキー）が混ざっていないかチェックし、あればリセットする
+    const isClean = Object.keys(State.unitNames || {}).every(k => !isNaN(k) && k !== '');
+    if (!isClean) {
+        State.unitNames = {};
+    }
+
+    State.unitNames[u] = trimmed;
     saveAll();
-    // ヘッダーのみ更新
-    const hdr = document.getElementById(`unit-header-${u}`);
-    if (hdr) {
-        const dot = hdr.querySelector('.warn-dot');
-        const dotHtml = dot ? dot.outerHTML : '<span class="warn-dot"></span>';
-        hdr.innerHTML = `<span class="unit-name-label" title="ダブルクリックで名称変更（この曜日のみ）">${trimmed}</span>${dotHtml}`;
+
+    // UIを再描画して月曜〜日曜まですべて反映させる
+    if (typeof buildTimeline === 'function') {
+        buildTimeline(currentWeekKey(), currentDayKey());
     }
 }
 
@@ -115,14 +116,14 @@ function buildTimeline(weekKey, dayKey) {
         col.className = 'unit-col';
         col.dataset.unit = u;
 
-        // Header (ダブルクリックで名称変更)
+        // Header (クリックで名称変更)
         const hdr = document.createElement('div');
         hdr.className = 'unit-header';
         hdr.id = `unit-header-${u}`;
-        hdr.title = 'ダブルクリックで名称変更';
-        const unitLabel = getUnitName(u, dayKey);
+        hdr.title = 'クリックで名称変更';
+        const unitLabel = getUnitName(u);
         hdr.innerHTML = `<span class="unit-name-label">${unitLabel}</span><span class="warn-dot"></span>`;
-        hdr.addEventListener('dblclick', (e) => {
+        hdr.addEventListener('click', (e) => {
             e.stopPropagation();
             renameUnit(u);
         });
@@ -396,9 +397,9 @@ function refreshValidation(weekKey, dayKey) {
             if (v.overlaps.has(sh.id)) hasError = true;
         });
         hdr.className = 'unit-header' + (hasError ? ' has-error' : hasWarn ? ' has-warning' : '');
-        const unitLabel = getUnitName(u, dayKey);
-        hdr.innerHTML = `<span class="unit-name-label" title="ダブルクリックで名称変更">${unitLabel}</span><span class="warn-dot"></span>`;
-        hdr.addEventListener('dblclick', (e) => { e.stopPropagation(); renameUnit(u); });
+        const unitLabel = getUnitName(u);
+        hdr.innerHTML = `<span class="unit-name-label" title="クリックで名称変更">${unitLabel}</span><span class="warn-dot"></span>`;
+        // addEventListener は timeline.js の buildTimeline() 生成時に一度だけ登録されているため、ここでは再登録しない
     }
 
     // Update shift block styles & badges

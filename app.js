@@ -129,6 +129,7 @@ function initApp() {
     setupCalendar();
     buildColorPicker();
     setupSyncUI();
+    setupAppSettings();
 
     // 初期ロード（クラウド設定があればクラウドから読み込む）
     loadAll(true).then(() => {
@@ -246,6 +247,13 @@ function setupHeaderButtons() {
             });
         });
     }
+
+    document.getElementById('btn-app-settings')?.addEventListener('click', () => {
+        const modal = document.getElementById('modal-app-settings');
+        if (!modal) return;
+        document.getElementById('input-total-units').value = TOTAL_UNITS;
+        openModal('modal-app-settings');
+    });
 
     document.getElementById('btn-pdf')?.addEventListener('click', () => {
         showToast('info', 'PDF出力', '印刷ダイアログを表示します。');
@@ -366,9 +374,39 @@ function updateSyncHeaderIcon() {
     }
 }
 
+// ------ 環境設定 (アプリ全般) ------
+function setupAppSettings() {
+    document.getElementById('btn-app-settings-save')?.addEventListener('click', () => {
+        const val = parseInt(document.getElementById('input-total-units').value, 10);
+        if (isNaN(val) || val < 1 || val > 50) {
+            showToast('error', '設定エラー', 'ユニット数は1〜50の間で指定してください。');
+            return;
+        }
+
+        TOTAL_UNITS = val;
+
+        // localStorageに保存（data.js の saveAll を経由するか直接）
+        localStorage.setItem(LS_KEYS.totalUnits, TOTAL_UNITS.toString());
+
+        closeModal('modal-app-settings');
+        showToast('success', '設定保存', '環境設定を保存しました。画面を再構築します。');
+
+        // 画面の再描画が必要
+        if (typeof buildTimeline === 'function') {
+            buildTimeline(currentWeekKey(), currentDayKey());
+        }
+    });
+
+    // モーダルクローズ設定追加
+    const closeBtn = document.getElementById('close-app-settings');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => closeModal('modal-app-settings'));
+    }
+}
+
 // ------ モーダルclose設定 ------
 function setupModalClosers() {
-    ['modal-staff', 'modal-staff-list', 'modal-aggregate', 'modal-monthly', 'modal-shift-edit', 'modal-leave', 'modal-sync'].forEach(setupModalClose);
+    ['modal-staff', 'modal-staff-list', 'modal-aggregate', 'modal-monthly', 'modal-shift-edit', 'modal-leave', 'modal-sync', 'modal-app-settings'].forEach(setupModalClose);
 }
 
 // ------ キーボードショートカット ------
