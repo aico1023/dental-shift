@@ -420,6 +420,7 @@ function loadAll(forceCloud = false) {
           State.templates = deoptimized.templates || {};
           State.unitNames = deoptimized.unitNames || {};
           State.leaveRecords = deoptimized.leaveRecords || {};
+          State.customHolidays = deoptimized.customHolidays || {};
           showToast('success', '同期完了', 'クラウドの最新データを反映しました');
           return true;
         } else {

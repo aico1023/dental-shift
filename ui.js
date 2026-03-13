@@ -611,7 +611,7 @@ function renderWeeklySummary() {
         const th = document.createElement('th');
         const dk = dayKeyFromDate(d);
         const hName = getHolidayName(dk);
-        let cls = i === 5 ? 'sat' : i === 6 ? 'sun' : '';
+        let cls = i === 6 ? 'sat' : i === 0 ? 'sun' : '';
         if (hName) cls = 'holiday-col';
         if (cls) th.className = cls;
         th.innerHTML = `${DAY_NAMES[i]}<br><span style="font-weight:400;font-size:9px">${formatDate(d)}</span>${hName ? `<br><span style="font-size:8px;color:#dc2626;font-weight:700">${hName}</span>` : ''}`;
@@ -649,7 +649,7 @@ function renderWeeklySummary() {
             dayKeys.forEach((dk, i) => {
                 const td = document.createElement('td');
                 const hName = getHolidayName(dk);
-                let cls = i === 5 ? 'sat' : i === 6 ? 'sun' : '';
+                let cls = i === 6 ? 'sat' : i === 0 ? 'sun' : '';
                 if (hName) cls = 'holiday-col';
                 if (cls) td.className = cls;
 
@@ -736,7 +736,7 @@ function openLeaveModal() {
     days.forEach((d, i) => {
         const th = document.createElement('th');
         th.style.cssText = 'text-align:center;padding:6px 4px;min-width:80px;position:sticky;top:0;background:var(--bg);z-index:10;border-bottom:1px solid var(--border);';
-        const cls = i === 5 ? 'color:#3b82f6' : i === 6 ? 'color:#ef4444' : '';
+        const cls = i === 6 ? 'color:#3b82f6' : i === 0 ? 'color:#ef4444' : '';
         th.innerHTML = `<span style="${cls}">${DAY_NAMES[i]}<br><span style="font-size:10px;font-weight:400">${formatDate(d)}</span></span>`;
         headerRow.appendChild(th);
     });
