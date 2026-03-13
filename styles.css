@@ -4,17 +4,17 @@
    CSS Variables / Design Tokens
    ============================================================ */
 :root {
-  --bg: #f5f6fa;
+  --bg: #f8fafc;
   --surface: #ffffff;
-  --surface-hover: #f8f9fc;
-  --border: #e4e6ef;
-  --border-light: #f0f1f8;
-  --text-primary: #1a1d2e;
-  --text-secondary: #6b7280;
-  --text-muted: #9ca3af;
-  --accent: #4f7ef8;
-  --accent-light: #eef2ff;
-  --accent-hover: #3b6ae6;
+  --surface-hover: #f1f5f9;
+  --border: #e2e8f0;
+  --border-light: #f1f5f9;
+  --text-primary: #1e293b;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --accent: #3b82f6;
+  --accent-light: #eff6ff;
+  --accent-hover: #2563eb;
   --danger: #ef4444;
   --danger-light: #fef2f2;
   --warning: #f59e0b;
@@ -22,16 +22,16 @@
   --success: #10b981;
   --success-light: #ecfdf5;
 
-  --radius-sm: 6px;
-  --radius: 10px;
-  --radius-lg: 16px;
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.06);
+  --radius-sm: 4px;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1);
 
   --sidebar-width: 240px;
-  --header-height: 64px;
-  --tab-height: 48px;
+  --header-height: 60px;
+  --tab-height: 54px;
   --timeline-start: 9;
   --timeline-end: 19;
   --time-row-height: 60px;
@@ -86,7 +86,6 @@ ol {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  overflow: hidden;
 }
 
 /* Header */
@@ -99,36 +98,32 @@ ol {
   justify-content: space-between;
   padding: 0 20px;
   flex-shrink: 0;
+  z-index: 1000;
   box-shadow: var(--shadow-sm);
-  z-index: 100;
 }
 
-.header-left {
+.header-left, .header-right {
   display: flex;
   align-items: center;
   gap: 16px;
+  position: relative;
 }
 
 .app-logo {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 16px;
+  gap: 10px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--text-primary);
+  margin-right: 12px;
 }
 
-.app-logo .logo-icon {
-  width: 32px;
-  height: 32px;
-  background: linear-gradient(135deg, #4f7ef8, #7c5cfc);
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
+.logo-icon {
+  font-size: 24px;
 }
 
+/* Week Navigation */
 .week-nav {
   display: flex;
   align-items: center;
@@ -136,215 +131,75 @@ ol {
   position: relative;
 }
 
-/* ============================================================
-   カレンダーポップアップ
-   ============================================================ */
-.calendar-popup {
-  position: fixed;
-  top: calc(var(--header-height) + var(--tab-height) + 8px);
-  left: 8px;
-  z-index: 500;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-  padding: 12px;
-  width: 252px;
-  user-select: none;
-}
-
-.cal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-.cal-header button {
+.week-nav button {
   width: 28px;
   height: 28px;
-  border-radius: 50%;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  font-size: 11px;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s;
-}
-
-.cal-header button:hover {
-  background: var(--accent-light);
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-#cal-month-label {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.cal-weekdays {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  margin-bottom: 4px;
-}
-
-.cal-weekdays span {
-  text-align: center;
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text-muted);
-  padding: 2px 0;
-}
-
-.cal-weekdays span.sat {
-  color: #6366f1;
-}
-
-.cal-weekdays span.sun {
-  color: var(--danger);
-}
-
-.cal-days {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
-}
-
-.cal-day {
-  text-align: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
   font-size: 12px;
-  font-weight: 500;
-  color: var(--text-primary);
-  padding: 5px 2px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: all 0.12s;
-  line-height: 1.2;
-}
-
-.cal-day.cal-blank {
-  cursor: default;
-}
-
-.cal-day:not(.cal-blank):hover {
-  background: var(--accent-light);
-  color: var(--accent);
-}
-
-.cal-day.sat {
-  color: #6366f1;
-}
-
-.cal-day.sun {
-  color: var(--danger);
-}
-
-.cal-day.today {
-  background: var(--accent-light);
-  color: var(--accent);
-  font-weight: 700;
-  box-shadow: inset 0 0 0 1.5px var(--accent);
-}
-
-.cal-day.in-week {
-  background: rgba(79, 126, 248, 0.06);
-}
-
-.cal-day.selected {
-  background: var(--accent);
-  color: #fff !important;
-  font-weight: 800;
-  box-shadow: 0 2px 8px rgba(79, 126, 248, 0.4);
-}
-
-.cal-day.holiday {
-  text-decoration: underline;
-  text-decoration-color: var(--danger);
-  text-decoration-style: dotted;
-}
-
-
-/* カレンダーアイコンボタン */
-.btn-calendar-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #4f7ef8, #7c5cfc);
-  border: none;
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.18s;
-  box-shadow: 0 2px 8px rgba(79, 126, 248, 0.35);
-  flex-shrink: 0;
-}
-
-.btn-calendar-icon:hover {
-  background: linear-gradient(135deg, #3b6ae6, #6b3ef0);
-  box-shadow: 0 4px 16px rgba(79, 126, 248, 0.55);
-  transform: translateY(-1px);
-}
-
-.btn-calendar-icon:active {
-  transform: translateY(0) scale(0.95);
-  box-shadow: 0 2px 6px rgba(79, 126, 248, 0.3);
-}
-
-.btn-calendar-icon.active {
-  background: linear-gradient(135deg, #3b6ae6, #6b3ef0);
-  box-shadow: 0 0 0 3px rgba(79, 126, 248, 0.25), 0 4px 16px rgba(79, 126, 248, 0.4);
-}
-
-.week-nav button {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s;
+  transition: all 0.2s;
 }
 
 .week-nav button:hover {
-  background: var(--accent-light);
+  background: var(--surface);
   border-color: var(--accent);
   color: var(--accent);
 }
 
 #week-label {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-primary);
-  min-width: 160px;
+  font-size: 13px;
+  font-weight: 700;
+  min-width: 140px;
   text-align: center;
 }
 
-.header-right {
+.btn-calendar-icon {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+}
+
+.btn-calendar-icon:hover {
+  background: var(--bg);
+  color: var(--accent);
 }
 
 /* Buttons */
 .btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 7px 14px;
-  border-radius: var(--radius-sm);
+  padding: 8px 16px;
   font-size: 13px;
-  font-weight: 500;
-  transition: all 0.15s;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s;
+  border: 1px solid transparent;
+}
+
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-ghost {
@@ -355,58 +210,17 @@ ol {
 
 .btn-ghost:hover {
   background: var(--bg);
-  color: var(--text-primary);
-  border-color: var(--text-secondary);
-}
-
-.btn-primary {
-  background: var(--accent);
-  color: white;
-  border: 1px solid transparent;
-}
-
-.btn-primary:hover {
-  background: var(--accent-hover);
-  box-shadow: 0 2px 8px rgba(79, 126, 248, 0.35);
-}
-
-.btn-success {
-  background: var(--success);
-  color: white;
-  border: 1px solid transparent;
-}
-
-.btn-success:hover {
-  background: #059669;
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .btn-danger {
   background: var(--danger);
   color: white;
-  border: 1px solid transparent;
 }
 
 .btn-danger:hover {
   background: #dc2626;
-}
-
-.btn-warning {
-  background: var(--warning);
-  color: white;
-  border: 1px solid transparent;
-}
-
-.btn-warning:hover {
-  background: #d97706;
-}
-
-.btn-sm {
-  padding: 4px 10px;
-  font-size: 12px;
-}
-
-.btn-icon {
-  padding: 7px;
 }
 
 /* Day Tabs */
@@ -415,110 +229,358 @@ ol {
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   display: flex;
-  align-items: stretch;
-  padding: 0 20px;
-  gap: 2px;
-  flex-shrink: 0;
+  padding: 0 16px;
+  gap: 4px;
 }
 
 .day-tab {
+  padding: 0 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 4px 20px;
-  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  min-width: 80px;
+  /* border-top removed */
   cursor: pointer;
-  border: 1px solid transparent;
-  border-bottom: none;
-  transition: all 0.15s;
-  font-size: 13px;
-  position: relative;
-  bottom: -1px;
-}
-
-.day-tab .tab-day {
-  font-weight: 600;
-  font-size: 14px;
+  transition: all 0.2s;
   color: var(--text-muted);
-}
-
-.day-tab .tab-date {
-  font-size: 11px;
-  color: var(--text-muted);
-  opacity: 0.7;
 }
 
 .day-tab:hover {
-  background: var(--surface-hover);
+  color: var(--text-secondary);
 }
 
 .day-tab.active {
-  background: var(--accent-light);
-  border-color: var(--accent);
-  border-bottom-color: var(--accent-light);
-  color: var(--accent);
-  box-shadow: inset 0 3px 0 var(--accent);
+  background: rgba(124, 58, 237, 0.08);
+  color: #7c3aed;
 }
 
-.day-tab.active .tab-day {
-  color: var(--accent);
-  font-weight: 800;
+.tab-day {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
-.day-tab.active .tab-date {
-  color: var(--accent);
-  opacity: 0.75;
-  font-weight: 500;
+.tab-date {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
-.day-tab.today .tab-day {
-  color: var(--accent);
-}
-
-.day-tab.today .tab-date {
+.tab-holiday {
+  font-size: 9px;
+  color: #ef4444;
   font-weight: 600;
-  color: var(--accent);
+  margin-top: 1px;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.day-tab.sunday .tab-day {
-  color: rgba(239, 68, 68, 0.35);
+.day-tab.saturday { color: #2563eb; }
+.day-tab.sunday { color: #ef4444; }
+
+.day-tab.saturday.active {
+  background: rgba(37, 99, 235, 0.08);
+  color: #2563eb;
 }
 
 .day-tab.sunday.active {
-  background: #fef2f2;
-  border-color: var(--danger);
-  border-bottom-color: #fef2f2;
-  box-shadow: inset 0 3px 0 var(--danger);
+  background: rgba(220, 38, 38, 0.05);
+  color: #ef4444;
 }
 
-.day-tab.sunday.active .tab-day {
+/* ============================================================
+   Modals
+   ============================================================ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.25s ease;
+}
+
+.modal-overlay.open {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.modal {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  width: 480px;
+  max-width: 95vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  transform: translateY(20px);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  overflow: hidden;
+}
+
+.modal-overlay.open .modal {
+  transform: translateY(0);
+}
+
+.modal-lg { width: 720px; }
+.modal-xl { width: 900px; }
+
+.modal-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface);
+}
+
+.modal-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.modal-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  transition: all 0.2s;
+}
+
+.modal-close:hover {
+  background: var(--danger-light);
   color: var(--danger);
+  transform: rotate(90deg);
 }
 
-.day-tab.sunday.active .tab-date {
-  color: var(--danger);
-  opacity: 0.75;
+.modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
 }
 
-.day-tab.saturday .tab-day {
-  color: rgba(99, 102, 241, 0.35);
+.modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  background: var(--bg);
 }
 
-.day-tab.saturday.active {
-  background: #eff0ff;
-  border-color: #6366f1;
-  border-bottom-color: #eff0ff;
-  box-shadow: inset 0 3px 0 #6366f1;
+/* ============================================================
+   Forms
+   ============================================================ */
+.form-group {
+  margin-bottom: 20px;
 }
 
-.day-tab.saturday.active .tab-day {
-  color: #6366f1;
+.form-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
 }
 
-.day-tab.saturday.active .tab-date {
-  color: #6366f1;
-  opacity: 0.75;
+.form-control {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  background: var(--surface);
+  transition: all 0.2s;
+}
+
+.form-control:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(79, 126, 248, 0.1);
+}
+
+.form-row {
+  display: flex;
+  gap: 16px;
+}
+
+.form-row > .form-group {
+  flex: 1;
+}
+
+.radio-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.radio-btn {
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+  user-select: none;
+}
+
+.radio-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.radio-btn.selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+  box-shadow: 0 2px 8px rgba(79, 126, 248, 0.3);
+}
+
+.radio-btn input { display: none; }
+
+/* ============================================================
+   Dropdowns
+   ============================================================ */
+.dropdown-container {
+  position: relative;
+  display: inline-block;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  min-width: 200px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0;
+  transform-origin: top right;
+  animation: dropdown-fade 0.2s ease;
+}
+
+@keyframes dropdown-fade {
+  from { opacity: 0; transform: translateY(-10px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.dropdown-item {
+  padding: 10px 16px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.2s;
+}
+
+.dropdown-item:hover {
+  background: var(--surface-hover);
+  color: var(--accent);
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: var(--border-light);
+  margin: 6px 0;
+}
+
+/* ============================================================
+   Calendar Popup
+   ============================================================ */
+.calendar-popup {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: -20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  padding: 16px;
+  z-index: 10001;
+  width: 280px;
+}
+
+.cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.cal-header span {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.cal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.cal-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.cal-day {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cal-day:hover { background: var(--surface-hover); transform: translateY(-1px); }
+.cal-day.today { color: #f59e0b; font-weight: 800; text-decoration: underline; text-underline-offset: 4px; }
+.cal-day.selected { 
+  background: #7c3aed !important; 
+  color: white !important; 
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+  transform: scale(1.05);
+}
+.cal-day.other-month { opacity: 0.2; }
+.cal-day.sun, .cal-day.holiday { color: #dc2626; font-weight: 700; background: rgba(220, 38, 38, 0.04); }
+.cal-day.sat { color: #2563eb; font-weight: 700; background: rgba(37, 99, 235, 0.04); }
+.cal-day.holiday::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  width: 4px;
+  height: 4px;
+  background: #dc2626;
+  border-radius: 50%;
 }
 
 /* Main Body */
@@ -609,6 +671,36 @@ ol {
 
 .staff-card:active {
   cursor: grabbing;
+}
+
+.staff-card.has-error {
+  border: 1.5px solid #dc2626 !important;
+  background: rgba(220, 38, 38, 0.05) !important;
+  box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.1);
+}
+
+.staff-card.has-error .staff-name {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.staff-card.has-error::after {
+  content: '❗未配置';
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  font-size: 10px;
+  font-weight: 800;
+  color: #dc2626;
+  background: white;
+  padding: 1px 4px;
+  border-radius: 4px;
+  border: 1px solid #dc2626;
+}
+
+.staff-card.has-leave-conflict {
+  opacity: 0.6;
 }
 
 .staff-card.dragging-source {
@@ -710,6 +802,7 @@ ol {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
   overflow: hidden;
+  position: relative; /* 祝日バナーの基準点 */
 }
 
 /* Time label column */
@@ -1603,7 +1696,6 @@ ol {
    Print styles
    ============================================================ */
 @media print {
-
   #header .header-right,
   #day-tabs,
   #staff-panel,
@@ -1616,64 +1708,6 @@ ol {
     display: none !important;
   }
 
-  body.print-modal-mode #app {
-    display: none !important;
-  }
-
-  body.print-modal-mode .modal-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: auto;
-    background: transparent;
-    display: block !important;
-    overflow: visible;
-  }
-
-  body.print-modal-mode .modal {
-    box-shadow: none !important;
-    border: none !important;
-    max-width: none !important;
-    width: 100% !important;
-    height: auto !important;
-    max-height: none !important;
-    overflow: visible !important;
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-
-  body.print-modal-mode .modal-header {
-    border: none !important;
-    padding: 0 !important;
-    margin-bottom: 20px !important;
-    display: block !important;
-    text-align: center !important;
-  }
-
-  body.print-modal-mode .modal-header * {
-    display: none !important;
-  }
-
-  body.print-modal-mode .modal-header .modal-title,
-  body.print-modal-mode .modal-header .modal-title * {
-    display: inline-block !important;
-    font-size: 24px !important;
-    font-weight: 700 !important;
-  }
-
-  body.print-modal-mode .modal-footer {
-    display: none !important;
-  }
-
-  body.print-modal-mode .modal-body,
-  body.print-modal-mode #monthly-table-container {
-    overflow: visible !important;
-    max-height: none !important;
-    height: auto !important;
-    display: block !important;
-    padding: 0 !important;
-  }
 
   #app {
     height: auto;
@@ -2049,26 +2083,25 @@ ol {
   margin-top: 1px;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
 }
 
 /* 休診バナー（タイムライン上のオーバーレイ） */
 .holiday-banner {
   position: absolute;
-  inset: 0;
+  top: 36px;    /* ユニットヘッダーの高さ */
+  left: 52px;   /* 時間列の幅 */
+  right: 0;
+  bottom: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 8px;
   background: rgba(220, 38, 38, 0.06);
-  border: 2px dashed rgba(220, 38, 38, 0.3);
+  border: 1px dashed rgba(220, 38, 38, 0.3);
   border-radius: var(--radius);
   pointer-events: none;
   z-index: 50;
-  margin: 36px 0 0 56px;
-  /* ヘッダー・時間列ぶんオフセット */
 }
 
 .holiday-banner-icon {
@@ -2125,4 +2158,11 @@ ol {
 .remove-assist:hover {
   background: rgba(220, 38, 38, 0.15);
   color: var(--danger);
+}
+.maintenance-section {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  background: var(--surface-hover);
+  margin-top: 20px;
 }

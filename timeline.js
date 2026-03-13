@@ -200,13 +200,12 @@ function buildTimeline(weekKey, dayKey) {
 
     // 休診バナー（祝日）
     if (holidayName) {
-        const workspace = document.getElementById('workspace');
-        if (workspace) {
+        if (container) {
             const banner = document.createElement('div');
             banner.id = 'holiday-banner';
             banner.className = 'holiday-banner';
             banner.innerHTML = `<span class="holiday-banner-icon">🎌</span><span class="holiday-banner-name">${holidayName}</span><span class="holiday-banner-sub">休診日</span>`;
-            workspace.appendChild(banner);
+            container.appendChild(banner);
         }
     }
 }
@@ -253,6 +252,7 @@ function renderShiftBlock(sh, unitNum, validation) {
     let warnMsg = '';
     if (validation) {
         if (validation.overlaps.has(sh.id)) { hasWarn = true; warnMsg = '勤務時間が重複しています'; }
+        else if (validation.leaveConflicts.has(sh.id)) { hasWarn = true; warnMsg = '休暇中のスタッフが配置されています'; }
         else if (validation.daWarnings.has(sh.id)) { hasWarn = true; warnMsg = 'DAが未配置です'; }
         else if (validation.drlessWarnings.has(sh.id)) { hasWarn = true; warnMsg = 'DrなしでDAが単独配置されています'; }
     }
@@ -394,12 +394,11 @@ function refreshValidation(weekKey, dayKey) {
         let hasWarn = false, hasError = false;
         arr.forEach(sh => {
             if (v.daWarnings.has(sh.id)) hasWarn = true;
-            if (v.overlaps.has(sh.id)) hasError = true;
+            if (v.overlaps.has(sh.id) || v.leaveConflicts.has(sh.id)) hasError = true;
         });
         hdr.className = 'unit-header' + (hasError ? ' has-error' : hasWarn ? ' has-warning' : '');
         const unitLabel = getUnitName(u);
         hdr.innerHTML = `<span class="unit-name-label" title="クリックで名称変更">${unitLabel}</span><span class="warn-dot"></span>`;
-        // addEventListener は timeline.js の buildTimeline() 生成時に一度だけ登録されているため、ここでは再登録しない
     }
 
     // Update shift block styles & badges
@@ -410,6 +409,7 @@ function refreshValidation(weekKey, dayKey) {
 
         let hasWarn = false, warnMsg = '';
         if (v.overlaps.has(sid)) { hasWarn = true; warnMsg = '勤務時間が重複しています'; }
+        else if (v.leaveConflicts.has(sid)) { hasWarn = true; warnMsg = '休暇中のスタッフが配置されています'; }
         else if (v.daWarnings.has(sid)) { hasWarn = true; warnMsg = 'DAが未配置です'; }
         else if (v.drlessWarnings && v.drlessWarnings.has(sid)) { hasWarn = true; warnMsg = 'DrなしDA単独配置'; }
 
@@ -429,6 +429,11 @@ function refreshValidation(weekKey, dayKey) {
     // Update reception warnings
     const rcWarn = v.reception;
     updateReceptionWarnings(rcWarn);
+
+    // Update staff panel (for missing attendance errors)
+    if (typeof renderStaffPanel === 'function') {
+        renderStaffPanel();
+    }
 }
 
 function buildReceptionPanel(weekKey, dayKey) {

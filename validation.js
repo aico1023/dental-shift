@@ -78,13 +78,87 @@ function checkDrlessWarnings(weekKey, dayKey) {
     return warns;
 }
 
+// 休暇との重複チェック: 休み（有給・HM・その他休暇）なのにシフトが入っている
+function checkLeaveConflicts(weekKey, dayKey) {
+    const conflicts = new Set(); // shiftId
+    const dayShifts = getDayShifts(weekKey, dayKey);
+    const leaveTypesToFlag = ['paid', 'happy', 'other-vibkyuu'];
+
+    for (let u = 1; u <= TOTAL_UNITS; u++) {
+        const arr = getUnitShifts(weekKey, dayKey, u);
+        arr.forEach(sh => {
+            const staffIds = [sh.doctorId, ...(sh.daIds || []), ...(sh.dhIds || []), ...(sh.tcIds || [])].filter(Boolean);
+            staffIds.forEach(sid => {
+                const leaveType = getLeaveRecord(weekKey, sid, dayKey);
+                if (leaveType && leaveTypesToFlag.includes(leaveType)) {
+                    conflicts.add(sh.id);
+                }
+            });
+        });
+    }
+
+    // 受付シフトもチェック
+    const rc = getDayReception(weekKey, dayKey);
+    const rcStaff = [...rc.am, ...rc.pm];
+    const rcConflicts = new Set(); // staffId
+    rcStaff.forEach(sid => {
+        const leaveType = getLeaveRecord(weekKey, sid, dayKey);
+        if (leaveType && leaveTypesToFlag.includes(leaveType)) {
+            rcConflicts.add(sid);
+        }
+    });
+
+    return { shiftConflicts: conflicts, receptionConflicts: rcConflicts };
+}
+
+// 出勤（振出）なのにシフトがないチェック
+function checkAttendanceRequirements(weekKey, dayKey) {
+    const missingShiftStaff = new Set(); // staffId
+    const attendanceTypes = ['comz-vibshutu', 'other-vibshutu'];
+
+    // 振出設定されているスタッフを抽出
+    State.staff.forEach(s => {
+        const leaveType = getLeaveRecord(weekKey, s.id, dayKey);
+        if (leaveType && attendanceTypes.includes(leaveType)) {
+            // シフトに入っているか確認
+            let hasShift = false;
+            // ユニットシフト
+            for (let u = 1; u <= TOTAL_UNITS; u++) {
+                const arr = getUnitShifts(weekKey, dayKey, u);
+                const isScheduled = arr.some(sh => 
+                    String(sh.doctorId) === String(s.id) || 
+                    (sh.daIds && sh.daIds.map(String).includes(String(s.id))) || 
+                    (sh.dhIds && sh.dhIds.map(String).includes(String(s.id))) || 
+                    (sh.tcIds && sh.tcIds.map(String).includes(String(s.id)))
+                );
+                if (isScheduled) { hasShift = true; break; }
+            }
+            // 受付シフト
+            if (!hasShift) {
+                const rc = getDayReception(weekKey, dayKey);
+                if (rc.am.map(String).includes(String(s.id)) || rc.pm.map(String).includes(String(s.id))) hasShift = true;
+            }
+
+            if (!hasShift) {
+                missingShiftStaff.add(s.id);
+            }
+        }
+    });
+
+    return missingShiftStaff;
+}
+
 // 総合バリデーション結果
 function runValidation(weekKey, dayKey) {
+    const leaveRes = checkLeaveConflicts(weekKey, dayKey);
     return {
         overlaps: checkStaffOverlaps(weekKey, dayKey),
         daWarnings: checkDaWarnings(weekKey, dayKey),
         drlessWarnings: checkDrlessWarnings(weekKey, dayKey),
         reception: checkReceptionWarnings(weekKey, dayKey),
+        leaveConflicts: leaveRes.shiftConflicts,
+        receptionLeaveConflicts: leaveRes.receptionConflicts,
+        missingAttendance: checkAttendanceRequirements(weekKey, dayKey),
     };
 }
 

@@ -346,6 +346,36 @@
           </div>
           <input type="number" id="input-total-units" class="form-control" min="1" max="50" style="width:100px;">
         </div>
+
+        <div class="dropdown-divider" style="margin:20px 0;"></div>
+
+        <div class="maintenance-section">
+          <div class="form-group">
+            <label class="form-label">📊 データメンテナンス</label>
+            <div style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">
+              クラウド保存の容量を節約するため、古いデータを整理できます。
+            </div>
+            <div class="status-summary" style="background:var(--bg); padding:10px; border-radius:var(--radius-sm); margin-bottom:12px;">
+              <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                <span>現在のデータサイズ:</span>
+                <span id="data-size-display" style="font-weight:700;">-- KB</span>
+              </div>
+              <div style="font-size:11px; color:var(--text-muted);">※ GASの制限（約9KB〜50KB）に合わせて調整してください。</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <select id="cleanup-months" class="form-control" style="width:140px; font-size:12px;">
+                <option value="3">3ヶ月以上前を削除</option>
+                <option value="6" selected>6ヶ月以上前を削除</option>
+                <option value="12">1年以上前を削除</option>
+              </select>
+              <button class="btn btn-danger btn-sm" id="btn-cleanup-start">一括削除</button>
+            </div>
+            <div style="margin-top:20px; padding-top:15px; border-top:1px solid var(--border);">
+              <button class="btn btn-danger btn-sm" id="btn-clear-unit-shifts" style="width:100%">ユニット別シフトを全削除</button>
+              <div style="font-size:10px; color:var(--text-muted); margin-top:4px;">※ スタッフや休暇、休診日の設定は維持されます。</div>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="modal-footer" style="display: flex; justify-content: flex-end; align-items: center;">
         <div>

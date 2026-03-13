@@ -11,6 +11,7 @@ const LEAVE_TYPES = {
     'other-vibshutu': { label: '🔁 出勤', cls: 'leave-vibshutu', bg: 'rgba(20,184,166,0.12)' },
 };
 
+
 // ------ Toast通知 ------
 function showToast(type, title, msg, duration = 3500) {
     const icons = { info: 'ℹ️', success: '✅', warning: '⚠️', error: '❌' };
@@ -56,6 +57,8 @@ function renderStaffPanel() {
     const roleOrder = ['dr', 'da', 'dh', 'reception'];
     const roleLabels = { dr: 'Dr（歯科医師）', dh: 'DH（衛生士）', da: 'DA（助手）', reception: 'TC' };
 
+    const validation = runValidation(wk, dk);
+
     roleOrder.forEach(role => {
         const members = State.staff.filter(s => s.role === role);
         if (members.length === 0) return;
@@ -72,6 +75,11 @@ function renderStaffPanel() {
             const card = document.createElement('div');
             card.className = 'staff-card';
             card.id = `staff-card-${s.id}`;
+
+            if (validation.missingAttendance.has(s.id)) {
+                card.classList.add('has-error');
+                card.title = '振出設定ですがシフトが未入力です';
+            }
 
             // 当日の休暇状態を取得
             const leaveType = getLeaveRecord(wk, s.id, dk);
@@ -404,6 +412,61 @@ function openAggregateModal() {
     openModal('modal-aggregate');
 }
 
+// ------ 環境設定 (アプリ全般) ------
+function setupAppSettings() {
+    document.getElementById('btn-app-settings')?.addEventListener('click', () => {
+        const modal = document.getElementById('modal-app-settings');
+        if (!modal) return;
+        document.getElementById('input-total-units').value = TOTAL_UNITS;
+        updateDataSizeDisplay();
+        openModal('modal-app-settings');
+    });
+
+    function updateDataSizeDisplay() {
+        const info = getDataSizeInfo();
+        const display = document.getElementById('data-size-display');
+        if (display) {
+            display.textContent = `${info.kb} KB`;
+            // 9KB (GAS Script Properties Limit) を警告基準にする
+            if (info.bytes > 9000) display.style.color = 'var(--danger)';
+            else if (info.bytes > 7000) display.style.color = 'var(--warning)';
+            else display.style.color = 'var(--success)';
+        }
+    }
+
+    document.getElementById('btn-cleanup-start')?.addEventListener('click', () => {
+        const months = parseInt(document.getElementById('cleanup-months').value, 10);
+        if (confirm(`${months}ヶ月以上前のシフト・休暇データを削除しますか？\n(この操作は取り消せません)`)) {
+            const removed = cleanupOldData(months);
+            updateDataSizeDisplay();
+            showToast('success', 'クリーンアップ完了', `${removed}週分のデータを削除しました。再度「保存」を行ってください。`);
+        }
+    });
+
+    document.getElementById('btn-app-settings-save')?.addEventListener('click', () => {
+        const val = parseInt(document.getElementById('input-total-units').value, 10);
+        if (isNaN(val) || val < 1 || val > 50) {
+            showToast('error', '設定エラー', 'ユニット数は1〜50の間で指定してください。');
+            return;
+        }
+
+        TOTAL_UNITS = val;
+        localStorage.setItem(LS_KEYS.totalUnits, TOTAL_UNITS.toString());
+
+        closeModal('modal-app-settings');
+        showToast('success', '設定保存', '環境設定を保存しました。画面を再構築します。');
+
+        if (typeof buildTimeline === 'function') {
+            buildTimeline(currentWeekKey(), currentDayKey());
+        }
+    });
+
+    const closeBtn = document.getElementById('close-app-settings');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => closeModal('modal-app-settings'));
+    }
+}
+
 // ------ テンプレ保存 ------
 function openTemplateSaveModal() {
     const name = prompt('テンプレート名を入力してください：');
@@ -468,25 +531,32 @@ function openTemplateApplyModal() {
 
     currentDays.forEach((dk, index) => {
         const srcKey = isOldFormat ? sortedKeys[index] : index.toString();
+        const holidayName = getHolidayName(dk);
 
-        if (tpl.shifts && tpl.shifts[srcKey]) {
-            State.weekShifts[wk][dk] = JSON.parse(JSON.stringify(tpl.shifts[srcKey]));
-            // Regenerate shift IDs
-            Object.values(State.weekShifts[wk][dk]).forEach(unitShifts => {
-                if (Array.isArray(unitShifts)) {
-                    unitShifts.forEach(sh => {
-                        sh.id = newShiftId();
-                    });
-                }
-            });
-        } else {
+        if (holidayName) {
+            // 祝日の場合はスキップ（空にする）
             State.weekShifts[wk][dk] = {};
-        }
-
-        if (tpl.reception && tpl.reception[srcKey]) {
-            State.receptionShifts[wk][dk] = JSON.parse(JSON.stringify(tpl.reception[srcKey]));
-        } else {
             State.receptionShifts[wk][dk] = { am: [], pm: [] };
+        } else {
+            if (tpl.shifts && tpl.shifts[srcKey]) {
+                State.weekShifts[wk][dk] = JSON.parse(JSON.stringify(tpl.shifts[srcKey]));
+                // Regenerate shift IDs
+                Object.values(State.weekShifts[wk][dk]).forEach(unitShifts => {
+                    if (Array.isArray(unitShifts)) {
+                        unitShifts.forEach(sh => {
+                            sh.id = newShiftId();
+                        });
+                    }
+                });
+            } else {
+                State.weekShifts[wk][dk] = {};
+            }
+
+            if (tpl.reception && tpl.reception[srcKey]) {
+                State.receptionShifts[wk][dk] = JSON.parse(JSON.stringify(tpl.reception[srcKey]));
+            } else {
+                State.receptionShifts[wk][dk] = { am: [], pm: [] };
+            }
         }
     });
 
@@ -805,7 +875,7 @@ function openMonthlyModal(year, month) {
     for (let day = 1; day <= numDays; day++) {
         const d = new Date(_currentMonthlyYear, _currentMonthlyMonth, day);
         const dk = dayKeyFromDate(d);
-        const wk = weekKeyFromDate(getMonday(d));
+        const wk = weekKeyFromDate(getWeekStart(d));
 
         const tr = document.createElement('tr');
 
@@ -862,13 +932,14 @@ function openMonthlyModal(year, month) {
                         let timeStr = '';
                         // 9:00〜20:00 でなければ時間を表示
                         if (shiftData.start !== 9 || shiftData.end !== 20) {
-                            timeStr = `<span style="margin-left:2px; font-size:8px; color:var(--text-muted);">(${slotToStr(shiftData.start)}-${slotToStr(shiftData.end)})</span>`;
+                            // 前の形式に戻しつつ、1行に収まるようサイズ調整
+                            timeStr = `<span style="margin-left:2px; font-size:8px; color:#666; font-weight:normal;">(${slotToStr(shiftData.start)}-${slotToStr(shiftData.end)})</span>`;
                         }
 
-                        html += `<div style="display:flex; align-items:center; gap:3px; margin-bottom:2px; font-size:10px;">
-                                   <span style="width:6px;height:6px;border-radius:50%;background:${s.color};display:inline-block;flex-shrink:0;"></span>
-                                   <span style="font-weight:600;color:var(--text-secondary);font-size:9px;">${ROLES[role].label}</span>
-                                   <span>${s.name.split(' ').pop()} ${timeStr}</span>
+                        html += `<div style="display:flex; align-items:center; gap:2px; margin-bottom:1px; line-height:1.1; font-size:9px;">
+                                   <span style="width:4px;height:4px;border-radius:50%;background:${s.color};display:inline-block;flex-shrink:0;"></span>
+                                   <span style="font-weight:700;color:#555;font-size:8px;margin-right:2px;">${ROLES[role].label}</span>
+                                   <span style="white-space:nowrap;">${s.name.split(' ').pop()}${timeStr}</span>
                                  </div>`;
                     }
                 });

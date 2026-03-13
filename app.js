@@ -35,10 +35,9 @@ function renderCalendar() {
     label.textContent = `${_calYear}年 ${_calMonth + 1}月`;
     grid.innerHTML = '';
 
-    // 月初の曜日（月曜始まりに変換: 0=月, 6=日）
+    // 月初の曜日（0=日, 1=月...）
     const firstDay = new Date(_calYear, _calMonth, 1);
-    let startDow = firstDay.getDay(); // 0=日, 1=月...
-    startDow = startDow === 0 ? 6 : startDow - 1; // 月始まりに変換
+    const startDow = firstDay.getDay(); 
 
     const daysInMonth = new Date(_calYear, _calMonth + 1, 0).getDate();
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -74,22 +73,46 @@ function renderCalendar() {
         if (isToday) cls += ' today';
         if (isSelected) cls += ' selected';
         else if (inSelWeek) cls += ' in-week';
-        if (holidayName) cls += ' holiday';
+        
+        // 祝慶日またはカスタム休診日の名前を取得
+        const displayHolidayName = holidayName || (State.customHolidays && State.customHolidays[dk]);
+        if (displayHolidayName) cls += ' holiday';
+        
         cell.className = cls;
         cell.textContent = d;
-        if (holidayName) cell.title = holidayName;
+        if (displayHolidayName) cell.title = displayHolidayName;
 
         cell.addEventListener('click', () => {
-            // その日を含む週の月曜を計算
+            // その日を含む週の開始日（日曜日）を計算
             const clickedDate = new Date(_calYear, _calMonth, d);
-            const monday = getMonday(clickedDate);
-            State.currentWeekStart = monday;
-            // 曜日インデックス（月=0, 日=6）
-            let dayIdx = clickedDate.getDay();
-            dayIdx = dayIdx === 0 ? 6 : dayIdx - 1;
+            const weekStart = getWeekStart(clickedDate);
+            State.currentWeekStart = weekStart;
+            // 曜日インデックス（日=0, 月=1 ...）
+            const dayIdx = clickedDate.getDay();
             State.currentDayIndex = dayIdx;
             onWeekChange();
             closeCalendar();
+        });
+
+        // 右クリックで「休診日」を切り替え
+        cell.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            const holidayName = getHolidayName(dk);
+            if (State.customHolidays[dk]) {
+                delete State.customHolidays[dk];
+                showToast('info', '休診日解除', `${dk} の休診設定を解除しました。`);
+            } else if (holidayName) {
+                showToast('warning', '設定不可', `国民の祝日（${holidayName}）は強制的に休診となります。`);
+            } else {
+                const name = prompt('休診日の名前を入力してください（例：夏期休暇）', '休診日');
+                if (name !== null) {
+                    State.customHolidays[dk] = name || '休診日';
+                    showToast('success', '休診日設定', `${dk} を「${State.customHolidays[dk]}」として設定しました。`);
+                }
+            }
+            saveAll();
+            renderCalendar();
+            renderDayTabs(); // 曜日タブの背景色なども更新
         });
 
         grid.appendChild(cell);
@@ -133,7 +156,7 @@ function initApp() {
 
     // 初期ロード（クラウド設定があればクラウドから読み込む）
     loadAll(true).then(() => {
-        State.currentWeekStart = getMonday(new Date());
+        State.currentWeekStart = getWeekStart(new Date());
         renderDayTabs();
         renderWeekLabel();
         renderStaffPanel();
@@ -159,8 +182,8 @@ function renderDayTabs() {
     days.forEach((d, i) => {
         const tab = document.createElement('div');
         tab.className = 'day-tab';
-        if (i === 6) tab.classList.add('sunday');
-        else if (i === 5) tab.classList.add('saturday');
+        if (i === 0) tab.classList.add('sunday');
+        else if (i === 6) tab.classList.add('saturday');
         if (i === State.currentDayIndex) tab.classList.add('active');
 
         const dk = dayKeyFromDate(d);
@@ -248,12 +271,6 @@ function setupHeaderButtons() {
         });
     }
 
-    document.getElementById('btn-app-settings')?.addEventListener('click', () => {
-        const modal = document.getElementById('modal-app-settings');
-        if (!modal) return;
-        document.getElementById('input-total-units').value = TOTAL_UNITS;
-        openModal('modal-app-settings');
-    });
 
     document.getElementById('btn-pdf')?.addEventListener('click', () => {
         showToast('info', 'PDF出力', '印刷ダイアログを表示します。');
@@ -265,9 +282,19 @@ function setupHeaderButtons() {
     document.getElementById('btn-staff-list')?.addEventListener('click', openStaffListModal);
     document.getElementById('btn-leave')?.addEventListener('click', openLeaveModal);
     document.getElementById('today-btn')?.addEventListener('click', () => {
-        State.currentWeekStart = getMonday(new Date());
-        State.currentDayIndex = 0;
+        State.currentWeekStart = getWeekStart(new Date());
+        State.currentDayIndex = new Date().getDay(); // 今日を選択
         onWeekChange();
+    });
+
+    // ユニット別シフト全削除
+    document.getElementById('btn-clear-unit-shifts')?.addEventListener('click', () => {
+        if (!confirm('【警告】すべてのユニット別シフトを削除しますか？\n（スタッフ一覧や有給、受付シフト、休診日は削除されません）')) return;
+        if (!confirm('本当によろしいですか？この操作は取り消せません。')) return;
+        
+        clearUnitShifts();
+        onWeekChange();
+        showToast('success', '全削除完了', 'ユニット別シフトをすべて消去しました。');
     });
 
     document.getElementById('btn-sync-settings')?.addEventListener('click', () => {
@@ -374,35 +401,7 @@ function updateSyncHeaderIcon() {
     }
 }
 
-// ------ 環境設定 (アプリ全般) ------
-function setupAppSettings() {
-    document.getElementById('btn-app-settings-save')?.addEventListener('click', () => {
-        const val = parseInt(document.getElementById('input-total-units').value, 10);
-        if (isNaN(val) || val < 1 || val > 50) {
-            showToast('error', '設定エラー', 'ユニット数は1〜50の間で指定してください。');
-            return;
-        }
 
-        TOTAL_UNITS = val;
-
-        // localStorageに保存（data.js の saveAll を経由するか直接）
-        localStorage.setItem(LS_KEYS.totalUnits, TOTAL_UNITS.toString());
-
-        closeModal('modal-app-settings');
-        showToast('success', '設定保存', '環境設定を保存しました。画面を再構築します。');
-
-        // 画面の再描画が必要
-        if (typeof buildTimeline === 'function') {
-            buildTimeline(currentWeekKey(), currentDayKey());
-        }
-    });
-
-    // モーダルクローズ設定追加
-    const closeBtn = document.getElementById('close-app-settings');
-    if (closeBtn) {
-        closeBtn.addEventListener('click', () => closeModal('modal-app-settings'));
-    }
-}
 
 // ------ モーダルclose設定 ------
 function setupModalClosers() {
@@ -429,22 +428,77 @@ document.addEventListener('keydown', e => {
     }
 });
 
-// ------ モーダル印刷 ------
+// ------ モーダル印刷 (別ウィンドウ方式) ------
 window.printModal = function () {
-    document.body.classList.add('print-modal-mode');
+    const container = document.getElementById('monthly-table-container');
+    const title = document.getElementById('monthly-title')?.textContent || '月間ユニット表';
+    if (!container) return;
 
-    const afterPrint = () => {
-        document.body.classList.remove('print-modal-mode');
-        window.removeEventListener('afterprint', afterPrint);
-    };
-    window.addEventListener('afterprint', afterPrint);
+    // 印刷用の新しいウィンドウを開く
+    const printWin = window.open('', '_blank');
+    if (!printWin) {
+        alert('ポップアップがブロックされました。許可してから再度お試しください。');
+        return;
+    }
 
-    // Fallback for browsers that don't fire afterprint
-    setTimeout(() => {
-        document.body.classList.remove('print-modal-mode');
-    }, 2000);
+    // メインのCSSを取得
+    const styles = Array.from(document.styleSheets)
+        .map(sheet => {
+            try {
+                return Array.from(sheet.cssRules).map(rule => rule.cssText).join('');
+            } catch (e) { return ''; }
+        }).join('');
 
-    window.print();
+    printWin.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>${title}</title>
+            <style>
+                ${styles}
+                @media print {
+                    @page { size: landscape; margin: 0; }
+                    body { 
+                        padding: 15mm; 
+                        margin: 0; 
+                        background: white; 
+                        -webkit-print-color-adjust: exact; 
+                        print-color-adjust: exact; 
+                    }
+                    .print-only-header { display: block !important; text-align: center; margin-bottom: 20px; }
+                    table { width: 100% !important; border-collapse: collapse; page-break-inside: auto; }
+                    tr { page-break-inside: avoid; page-break-after: auto; }
+                    thead { display: table-header-group; }
+                    th, td { border: 1px solid #ccc !important; }
+                    /* 不要な要素を非表示 */
+                    .btn, button, .modal-close { display: none !important; }
+                }
+                body { font-family: sans-serif; padding: 20px; }
+                .print-only-header { text-align: center; margin-bottom: 20px; }
+                .print-only-header h1 { font-size: 20px; margin: 0; }
+                table { border-collapse: collapse; width: 100%; font-size: 11px; }
+                th, td { border: 1px solid #ccc; padding: 3px; text-align: left; }
+                th { background: #f5f5f5; }
+            </style>
+        </head>
+        <body>
+            <div class="print-only-header">
+                <h1>${title}</h1>
+            </div>
+            ${container.innerHTML}
+            <script>
+                window.onload = () => {
+                    setTimeout(() => {
+                        window.print();
+                        // 印刷ダイアログを閉じたらウィンドウも閉じる（ブラウザによる）
+                        window.onafterprint = () => window.close();
+                    }, 500);
+                };
+            </script>
+        </body>
+        </html>
+    `);
+    printWin.document.close();
 };
 
 // ------ 起動 ------

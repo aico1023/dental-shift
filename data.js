@@ -50,14 +50,15 @@ const State = {
   unitNames: {},
   // leaveRecords[weekKey][staffId][dayKey] = 'paid' | 'substitute' | undefined
   leaveRecords: {},
+  // customHolidays[dayKey] = string (holiday name)
+  customHolidays: {},
 };
 
 // ---- Week helpers ----
-function getMonday(d) {
+function getWeekStart(d) {
   const date = new Date(d);
-  const day = date.getDay();
-  const diff = (day === 0) ? -6 : 1 - day;
-  date.setDate(date.getDate() + diff);
+  const day = date.getDay(); // 0=Sun, 1=Mon...
+  date.setDate(date.getDate() - day);
   date.setHours(0, 0, 0, 0);
   return date;
 }
@@ -66,34 +67,34 @@ function _localDateStr(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function weekKeyFromDate(monday) {
-  return _localDateStr(monday);
+function weekKeyFromDate(weekStart) {
+  return _localDateStr(weekStart);
 }
 
 function dayKeyFromDate(d) {
   return _localDateStr(d);
 }
 
-function getDayDates(monday) {
+function getDayDates(weekStart) {
   return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday);
+    const d = new Date(weekStart);
     d.setDate(d.getDate() + i);
     return d;
   });
 }
 
-function formatWeekLabel(monday) {
-  const end = new Date(monday);
+function formatWeekLabel(weekStart) {
+  const end = new Date(weekStart);
   end.setDate(end.getDate() + 6);
   const fmt = d => `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
-  return `${fmt(monday)} 〜 ${fmt(end)}`;
+  return `${fmt(weekStart)} 〜 ${fmt(end)}`;
 }
 
 function formatDate(d) {
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
-const DAY_NAMES = ['月', '火', '水', '木', '金', '土', '日'];
+const DAY_NAMES = ['日', '月', '火', '水', '木', '金', '土'];
 
 // ---- Shift ID generator ----
 let _shiftIdCounter = Date.now();
@@ -171,6 +172,174 @@ function isCloudSyncEnabled() {
   return SyncSettings.mode === 'cloud' && !!SyncSettings.url;
 }
 
+// ---- Data Optimization (Key Shortening) ----
+const KEY_MAP = {
+  // Roots
+  weekShifts: 'ws',
+  receptionShifts: 'rs',
+  leaveRecords: 'lr',
+  unitNames: 'un',
+  templates: 'tm',
+  staff: 'st',
+  customHolidays: 'ch',
+  // Shift objects
+  doctorId: 'di',
+  dhIds: 'dh',
+  daIds: 'da',
+  tcIds: 'tc',
+  startSlot: 'ss',
+  endSlot: 'es',
+};
+
+// Inverse map for deoptimization
+const INV_KEY_MAP = Object.fromEntries(Object.entries(KEY_MAP).map(([k, v]) => [v, k]));
+
+function optimizeState(state) {
+  const optimized = {};
+  
+  // Optimize root keys
+  Object.keys(state).forEach(key => {
+    const shortKey = KEY_MAP[key] || key;
+    let value = state[key];
+    
+    if (key === 'weekShifts' && value) {
+      const optWS = {};
+      Object.keys(value).forEach(wk => {
+        optWS[wk] = {};
+        Object.keys(value[wk]).forEach(dk => {
+          optWS[wk][dk] = {};
+          Object.keys(value[wk][dk]).forEach(uk => {
+            optWS[wk][dk][uk] = value[wk][dk][uk].map(sh => {
+              const optSh = { id: sh.id };
+              if (sh.doctorId) optSh[KEY_MAP.doctorId] = sh.doctorId;
+              if (sh.dhIds) optSh[KEY_MAP.dhIds] = sh.dhIds;
+              if (sh.daIds) optSh[KEY_MAP.daIds] = sh.daIds;
+              if (sh.tcIds) optSh[KEY_MAP.tcIds] = sh.tcIds;
+              if (sh.startSlot !== undefined) optSh[KEY_MAP.startSlot] = sh.startSlot;
+              if (sh.endSlot !== undefined) optSh[KEY_MAP.endSlot] = sh.endSlot;
+              return optSh;
+            });
+          });
+        });
+      });
+      value = optWS;
+    }
+    
+    optimized[shortKey] = value;
+  });
+  
+  if (state.customHolidays) {
+    optimized[KEY_MAP.customHolidays] = state.customHolidays;
+  }
+  
+  return optimized;
+}
+
+function deoptimizeState(optState) {
+  const state = {};
+  
+  Object.keys(optState).forEach(shortKey => {
+    const key = INV_KEY_MAP[shortKey] || shortKey;
+    let value = optState[shortKey];
+    
+    if (key === 'weekShifts' && value) {
+      const deoptWS = {};
+      Object.keys(value).forEach(wk => {
+        deoptWS[wk] = {};
+        Object.keys(value[wk]).forEach(dk => {
+          deoptWS[wk][dk] = {};
+          Object.keys(value[wk][dk]).forEach(uk => {
+            deoptWS[wk][dk][uk] = value[wk][dk][uk].map(sh => {
+              const deoptSh = { id: sh.id };
+              if (sh[KEY_MAP.doctorId]) deoptSh.doctorId = sh[KEY_MAP.doctorId];
+              if (sh[KEY_MAP.dhIds]) deoptSh.dhIds = sh[KEY_MAP.dhIds];
+              if (sh[KEY_MAP.daIds]) deoptSh.daIds = sh[KEY_MAP.daIds];
+              if (sh[KEY_MAP.tcIds]) deoptSh.tcIds = sh[KEY_MAP.tcIds];
+              if (sh[KEY_MAP.startSlot] !== undefined) deoptSh.startSlot = sh[KEY_MAP.startSlot];
+              if (sh[KEY_MAP.endSlot] !== undefined) deoptSh.endSlot = sh[KEY_MAP.endSlot];
+              return deoptSh;
+            });
+          });
+        });
+      });
+      value = deoptWS;
+    }
+    
+    state[key] = value;
+  });
+  
+  if (optState[KEY_MAP.customHolidays]) {
+    state.customHolidays = optState[KEY_MAP.customHolidays];
+  }
+  
+  return state;
+}
+
+// ---- Data Size & Maintenance ----
+function getDataSizeInfo() {
+  const currentState = {
+    staff: State.staff,
+    weekShifts: State.weekShifts,
+    receptionShifts: State.receptionShifts,
+    templates: State.templates,
+    unitNames: State.unitNames,
+    leaveRecords: State.leaveRecords,
+    customHolidays: State.customHolidays
+  };
+  // クラウド保存時のサイズを基準にする（最適化後）
+  const optimized = optimizeState(currentState);
+  const json = JSON.stringify(optimized);
+  const bytes = new TextEncoder().encode(json).length;
+  return {
+    chars: json.length,
+    bytes: bytes,
+    kb: (bytes / 1024).toFixed(2)
+  };
+}
+
+function cleanupOldData(months) {
+  if (!months || months < 1) return 0;
+  const now = new Date();
+  const threshold = new Date(now.getFullYear(), now.getMonth() - months, 1);
+  const thresholdStr = _localDateStr(threshold);
+
+  let removedCount = 0;
+
+  // Cleanup weekShifts
+  Object.keys(State.weekShifts).forEach(wk => {
+    if (wk < thresholdStr) {
+      delete State.weekShifts[wk];
+      removedCount++;
+    }
+  });
+
+  // Cleanup receptionShifts
+  Object.keys(State.receptionShifts).forEach(wk => {
+    if (wk < thresholdStr) {
+      delete State.receptionShifts[wk];
+    }
+  });
+
+  // Cleanup unitNames
+  Object.keys(State.unitNames).forEach(dk => {
+    if (dk < thresholdStr) {
+      delete State.unitNames[dk];
+    }
+  });
+
+  // Cleanup leaveRecords
+  Object.keys(State.leaveRecords).forEach(wk => {
+    if (wk < thresholdStr) {
+      delete State.leaveRecords[wk];
+    }
+  });
+
+  if (removedCount > 0) {
+    saveAll();
+  }
+  return removedCount;
+}
+
 function saveAll() {
   const currentState = {
     staff: State.staff,
@@ -178,7 +347,8 @@ function saveAll() {
     receptionShifts: State.receptionShifts,
     templates: State.templates,
     unitNames: State.unitNames,
-    leaveRecords: State.leaveRecords
+    leaveRecords: State.leaveRecords,
+    customHolidays: State.customHolidays
   };
 
   try {
@@ -189,17 +359,22 @@ function saveAll() {
     localStorage.setItem(LS_KEYS.templates, JSON.stringify(State.templates));
     localStorage.setItem(LS_KEYS.unitNames, JSON.stringify(State.unitNames));
     localStorage.setItem(LS_KEYS.leave, JSON.stringify(State.leaveRecords));
+    localStorage.setItem('dsa_custom_holidays', JSON.stringify(State.customHolidays));
     localStorage.setItem(LS_KEYS.totalUnits, TOTAL_UNITS.toString());
 
     // クラウドモードの場合、GASにPOST送信
     if (isCloudSyncEnabled()) {
       showToast('info', '同期中...', '設定されたクラウドへデータを保存しています', 2000);
+      
+      // クラウド保存時はデータを短縮化（圧縮）して送信する
+      const optimized = optimizeState(currentState);
+      
       fetch(SyncSettings.url, {
         method: 'POST',
         headers: {
           'Content-Type': 'text/plain', // GAS側で受け取るためにtext/plainが安全
         },
-        body: JSON.stringify(currentState),
+        body: JSON.stringify(optimized),
       })
         .then(res => res.json())
         .then(data => {
@@ -229,14 +404,22 @@ function loadAll(forceCloud = false) {
     return fetch(fetchUrl)
       .then(res => res.json())
       .then(cloudData => {
-        if (cloudData && Object.keys(cloudData).length > 0 && Array.isArray(cloudData.staff)) {
-          // クラウドデータを正しく取得できた場合
-          State.staff = cloudData.staff;
-          State.weekShifts = cloudData.weekShifts || {};
-          State.receptionShifts = cloudData.receptionShifts || {};
-          State.templates = cloudData.templates || {};
-          State.unitNames = cloudData.unitNames || {};
-          State.leaveRecords = cloudData.leaveRecords || {};
+        if (cloudData && Object.keys(cloudData).length > 0) {
+          // 短縮化されたデータかチェック
+          const isOptimized = cloudData.ws || cloudData.st;
+          const deoptimized = isOptimized ? deoptimizeState(cloudData) : cloudData;
+          
+          if (!Array.isArray(deoptimized.staff)) {
+             throw new Error("Invalid staff data format");
+          }
+
+          // クラウドデータを反映
+          State.staff = deoptimized.staff;
+          State.weekShifts = deoptimized.weekShifts || {};
+          State.receptionShifts = deoptimized.receptionShifts || {};
+          State.templates = deoptimized.templates || {};
+          State.unitNames = deoptimized.unitNames || {};
+          State.leaveRecords = deoptimized.leaveRecords || {};
           showToast('success', '同期完了', 'クラウドの最新データを反映しました');
           return true;
         } else {
@@ -288,6 +471,8 @@ function _loadFromLocal() {
     State.unitNames = un ? JSON.parse(un) : {};
     const lv = localStorage.getItem(LS_KEYS.leave);
     State.leaveRecords = lv ? JSON.parse(lv) : {};
+    const ch = localStorage.getItem('dsa_custom_holidays');
+    State.customHolidays = ch ? JSON.parse(ch) : {};
     const tu = localStorage.getItem(LS_KEYS.totalUnits);
     TOTAL_UNITS = tu ? parseInt(tu, 10) : 11;
   } catch (e) {
@@ -392,20 +577,25 @@ function textColorFor(hex) {
 
 // ---- Prev-week copy ----
 function copyPrevWeek() {
-  const prevMonday = new Date(State.currentWeekStart);
-  prevMonday.setDate(prevMonday.getDate() - 7);
-  const prevWK = weekKeyFromDate(prevMonday);
+  const prevStart = new Date(State.currentWeekStart);
+  prevStart.setDate(prevStart.getDate() - 7);
+  const prevWK = weekKeyFromDate(prevStart);
   const curWK = currentWeekKey();
 
   // Copy shifts
   if (State.weekShifts[prevWK]) {
-    const prevDays = getDayDates(prevMonday);
+    const prevDays = getDayDates(prevStart);
     const curDays = getDayDates(State.currentWeekStart);
     State.weekShifts[curWK] = {};
     prevDays.forEach((pd, i) => {
       const pdk = dayKeyFromDate(pd);
       const cdk = dayKeyFromDate(curDays[i]);
-      if (State.weekShifts[prevWK][pdk]) {
+      const holidayName = getHolidayName(cdk);
+
+      if (holidayName) {
+        // 祝日の場合はコピーをスキップ（空にする）
+        State.weekShifts[curWK][cdk] = {};
+      } else if (State.weekShifts[prevWK] && State.weekShifts[prevWK][pdk]) {
         State.weekShifts[curWK][cdk] = JSON.parse(JSON.stringify(State.weekShifts[prevWK][pdk]));
         // Regenerate IDs
         Object.values(State.weekShifts[curWK][cdk]).forEach(arr => {
@@ -417,16 +607,26 @@ function copyPrevWeek() {
 
   // Copy reception
   if (State.receptionShifts[prevWK]) {
-    const prevDays = getDayDates(prevMonday);
+    const prevDays = getDayDates(prevStart);
     const curDays = getDayDates(State.currentWeekStart);
     State.receptionShifts[curWK] = {};
     prevDays.forEach((pd, i) => {
       const pdk = dayKeyFromDate(pd);
       const cdk = dayKeyFromDate(curDays[i]);
-      if (State.receptionShifts[prevWK][pdk]) {
+      const holidayName = getHolidayName(cdk);
+
+      if (holidayName) {
+        // 祝日の場合はコピーをスキップ
+        State.receptionShifts[curWK][cdk] = { am: [], pm: [] };
+      } else if (State.receptionShifts[prevWK] && State.receptionShifts[prevWK][pdk]) {
         State.receptionShifts[curWK][cdk] = JSON.parse(JSON.stringify(State.receptionShifts[prevWK][pdk]));
       }
     });
   }
+  saveAll();
+}
+
+function clearUnitShifts() {
+  State.weekShifts = {};
   saveAll();
 }

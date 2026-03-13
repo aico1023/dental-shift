@@ -116,6 +116,10 @@ function getHolidaysForYear(year) {
 
 // 主要公開API: 日付文字列 "YYYY-MM-DD" → 祝日名 or null
 function getHolidayName(dateStr) {
+    // カスタム休診日を優先
+    if (typeof State !== 'undefined' && State.customHolidays && State.customHolidays[dateStr]) {
+        return State.customHolidays[dateStr];
+    }
     const year = parseInt(dateStr.slice(0, 4));
     return getHolidaysForYear(year)[dateStr] || null;
 }
