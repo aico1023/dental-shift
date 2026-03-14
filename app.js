@@ -28,8 +28,8 @@ function isCalendarOpen() {
 }
 
 function renderCalendar() {
-    const label = document.getElementById('cal-month-label');
-    const grid = document.getElementById('cal-days');
+    const label = document.getElementById('calendar-month-year');
+    const grid = document.getElementById('calendar-days');
     if (!label || !grid) return;
 
     label.textContent = `${_calYear}年 ${_calMonth + 1}月`;
@@ -47,10 +47,9 @@ function renderCalendar() {
     const selWeekEnd = new Date(selWeekStart);
     selWeekEnd.setDate(selWeekEnd.getDate() + 6);
     // 現在選択中の日
-    const selDate = getDayDates(State.currentWeekStart)[State.currentDayIndex];
-    const selDateStr = selDate ? dayKeyFromDate(selDate) : '';
+    const selDateStr = currentDayKey();
 
-    // 空白セル
+    // 空白セル (日曜始まりを維持)
     for (let i = 0; i < startDow; i++) {
         const blank = document.createElement('div');
         blank.className = 'cal-day cal-blank';
@@ -124,13 +123,13 @@ function setupCalendar() {
         e.stopPropagation();
         if (isCalendarOpen()) { closeCalendar(); } else { openCalendar(); }
     });
-    document.getElementById('cal-prev-month')?.addEventListener('click', (e) => {
+    document.getElementById('calendar-prev-month')?.addEventListener('click', (e) => {
         e.stopPropagation();
         _calMonth--;
         if (_calMonth < 0) { _calMonth = 11; _calYear--; }
         renderCalendar();
     });
-    document.getElementById('cal-next-month')?.addEventListener('click', (e) => {
+    document.getElementById('calendar-next-month')?.addEventListener('click', (e) => {
         e.stopPropagation();
         _calMonth++;
         if (_calMonth > 11) { _calMonth = 0; _calYear++; }
@@ -171,26 +170,26 @@ function renderWeekLabel() {
     document.getElementById('week-label').textContent = formatWeekLabel(State.currentWeekStart);
 }
 
-// ------ 曜日タブ ------
 function renderDayTabs() {
     const container = document.getElementById('day-tabs');
     if (!container) return;
     container.innerHTML = '';
-    const today = new Date(); today.setHours(0, 0, 0, 0);
     const days = getDayDates(State.currentWeekStart);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
 
     days.forEach((d, i) => {
         const tab = document.createElement('div');
         tab.className = 'day-tab';
-        if (i === 0) tab.classList.add('sunday');
-        else if (i === 6) tab.classList.add('saturday');
+        const dayIdx = d.getDay();
+        if (dayIdx === 0) tab.classList.add('sunday');
+        else if (dayIdx === 6) tab.classList.add('saturday');
         if (i === State.currentDayIndex) tab.classList.add('active');
 
         const dk = dayKeyFromDate(d);
         const holidayName = getHolidayName(dk);
         if (holidayName) tab.classList.add('holiday');
 
-        tab.innerHTML = `<span class="tab-day">${DAY_NAMES[i]}</span><span class="tab-date">${formatDate(d)}</span>${holidayName ? `<span class="tab-holiday">${holidayName}</span>` : ''}`;
+        tab.innerHTML = `<span class="tab-day">${DAY_NAMES[dayIdx]}</span><span class="tab-date">${formatDate(d)}</span>${holidayName ? `<span class="tab-holiday">${holidayName}</span>` : ''}`;
         tab.addEventListener('click', () => switchDay(i));
         container.appendChild(tab);
     });
@@ -198,7 +197,7 @@ function renderDayTabs() {
 
 function switchDay(dayIndex) {
     State.currentDayIndex = dayIndex;
-    document.querySelectorAll('.day-tab').forEach((t, i) => t.classList.toggle('active', i === dayIndex));
+    renderDayTabs();
     buildTimeline(currentWeekKey(), currentDayKey());
     renderStaffPanel();
 }

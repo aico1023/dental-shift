@@ -1696,38 +1696,72 @@ ol {
    Print styles
    ============================================================ */
 @media print {
+  /* 印刷時も色とデザインを維持 */
+  html, body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-scheme: light !important;
+  }
+
   #header .header-right,
   #day-tabs,
   #staff-panel,
   #toast-container,
-  .context-menu {
+  .context-menu,
+  .modal-footer,
+  .modal-close {
     display: none !important;
   }
 
-  body:not(.print-modal-mode) .modal-overlay {
-    display: none !important;
+  body.print-modal-mode .modal-overlay {
+    position: relative !important;
+    display: block !important;
+    background: none !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
   }
 
+  body.print-modal-mode .modal {
+    width: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    box-shadow: none !important;
+    transform: none !important;
+    position: relative !important;
+    overflow: visible !important;
+  }
 
   #app {
-    height: auto;
+    height: auto !important;
+    display: block !important;
   }
 
   #main-body {
-    display: block;
+    display: block !important;
+    overflow: visible !important;
   }
 
   #workspace {
-    overflow: visible;
+    overflow: visible !important;
+    display: block !important;
   }
 
   #timeline-area {
-    overflow: visible;
-    padding: 0;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+
+  .weekly-table {
+    border: 1px solid #ccc !important;
+  }
+
+  .weekly-table th, .weekly-table td {
+    border: 1px solid #eee !important;
   }
 
   .shift-block {
     box-shadow: none !important;
+    border: 1px solid rgba(0,0,0,0.1) !important;
   }
 }
 

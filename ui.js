@@ -4,11 +4,11 @@
 
 // 休暇種別定義
 const LEAVE_TYPES = {
-    'paid': { label: '🏖️ 有給', cls: 'leave-paid', bg: 'rgba(249,115,22,0.12)' },
-    'happy': { label: '🎌 HM', cls: 'leave-happy', bg: 'rgba(139,92,246,0.12)' },
-    'other-vibkyuu': { label: '😴 休暇', cls: 'leave-vibkyuu', bg: 'rgba(6,182,212,0.12)' },
-    'comz-vibshutu': { label: '🌳 振出', cls: 'leave-comz', bg: 'rgba(16,185,129,0.12)' },
-    'other-vibshutu': { label: '🔁 出勤', cls: 'leave-vibshutu', bg: 'rgba(20,184,166,0.12)' },
+    'paid': { label: '🏖️ 有給休暇', shortLabel: '🏖️ 有給', cls: 'leave-paid', bg: 'rgba(249,115,22,0.12)' },
+    'happy': { label: '🎌 ハッピーマンデー', shortLabel: '🎌 HM', cls: 'leave-happy', bg: 'rgba(139,92,246,0.12)' },
+    'other-vibkyuu': { label: '😴 その他休暇', shortLabel: '😴 休暇', cls: 'leave-vibkyuu', bg: 'rgba(6,182,212,0.12)' },
+    'comz-vibshutu': { label: '🌳 コムズ振出', shortLabel: '🌳 振出', cls: 'leave-comz', bg: 'rgba(16,185,129,0.12)' },
+    'other-vibshutu': { label: '🔁 その他出勤', shortLabel: '🔁 出勤', cls: 'leave-vibshutu', bg: 'rgba(20,184,166,0.12)' },
 };
 
 
@@ -89,7 +89,7 @@ function renderStaffPanel() {
             const isAbsent = leaveInfo && !isVibshutu;
 
             const leaveBadgeHtml = leaveInfo
-                ? `<span class="staff-leave-badge ${leaveInfo.cls}">${leaveInfo.label}</span>`
+                ? `<span class="staff-leave-badge ${leaveInfo.cls}">${leaveInfo.shortLabel || leaveInfo.label}</span>`
                 : '';
 
             card.innerHTML = `
@@ -111,15 +111,14 @@ function renderStaffPanel() {
                 attachStaffDrag(card, s.id);
 
                 // --- ここからスタッフの並び替え用ドラッグ＆ドロップ設定 ---
-                // ※ drag.jsの attachStaffDrag は "copy"（シフト配置用）ですが、並び替えも同時にできるように判定を追加します。
                 card.addEventListener('dragenter', e => {
                     e.preventDefault();
-                    if (e.dataTransfer.types.includes('text/plain')) { // staffIdを持っているか
-                        card.style.borderTop = '2px solid var(--accent)'; // ドロップ位置のハイライト
+                    if (e.dataTransfer.types.includes('text/plain')) { 
+                        card.style.borderTop = '2px solid var(--accent)'; 
                     }
                 });
                 card.addEventListener('dragover', e => {
-                    e.preventDefault(); // ドロップを許可
+                    e.preventDefault(); 
                     e.dataTransfer.dropEffect = 'move';
                 });
                 card.addEventListener('dragleave', e => {
@@ -127,20 +126,18 @@ function renderStaffPanel() {
                 });
                 card.addEventListener('drop', e => {
                     e.preventDefault();
-                    e.stopPropagation(); // タイムライン等へのイベント伝播を防ぐ
+                    e.stopPropagation(); 
                     card.style.borderTop = '';
 
                     const draggedStaffId = e.dataTransfer.getData('staffId');
                     if (!draggedStaffId || draggedStaffId === String(s.id)) return;
 
-                    // 同じRoleの中でのみ入れ替え可能とする
                     const draggedStaff = State.staff.find(st => String(st.id) === draggedStaffId);
                     if (!draggedStaff || draggedStaff.role !== s.role) {
                         showToast('warning', '並び替えエラー', '異なる職種のスタッフとは入れ替えられません。', 2000);
                         return;
                     }
 
-                    // 並び替え処理 (State.staff 内の順序を入れ替える)
                     const fromIndex = State.staff.findIndex(st => String(st.id) === draggedStaffId);
                     const toIndex = State.staff.findIndex(st => String(st.id) === String(s.id));
 
@@ -148,10 +145,9 @@ function renderStaffPanel() {
                         const [movedStaff] = State.staff.splice(fromIndex, 1);
                         State.staff.splice(toIndex, 0, movedStaff);
                         saveAll();
-                        renderStaffPanel(); // UIを即座に再描画
+                        renderStaffPanel(); 
                     }
                 });
-                // --- 並び替え用設定ここまで ---
             }
             section.appendChild(card);
         });
@@ -198,7 +194,6 @@ function openShiftEditModal(shift, unitNum) {
 
 // ------ スタッフ追加・編集モーダル ------
 const STAFF_COLORS = COLORS;
-
 let _editingStaffId = null;
 
 function openStaffAddModal() {
@@ -267,8 +262,6 @@ function buildColorPicker() {
 
 function setupStaffModal() {
     buildColorPicker();
-
-    // Radio buttons
     document.querySelectorAll('[data-radio]').forEach(btn => {
         btn.addEventListener('click', () => {
             const group = btn.dataset.radio;
@@ -281,7 +274,6 @@ function setupStaffModal() {
         });
     });
 
-    // Save
     document.getElementById('sm-save')?.addEventListener('click', () => {
         const name = document.getElementById('sm-name')?.value.trim();
         if (!name) { showToast('error', '入力エラー', '名前を入力してください。'); return; }
@@ -302,7 +294,6 @@ function setupStaffModal() {
         showToast('success', _editingStaffId ? '更新完了' : '追加完了', `${name} を${_editingStaffId ? '更新' : '追加'}しました。`);
     });
 
-    // Delete
     document.getElementById('sm-delete')?.addEventListener('click', () => {
         if (!_editingStaffId) return;
         const s = getStaff(_editingStaffId);
@@ -345,7 +336,6 @@ function openAggregateModal() {
     if (!body) return;
     body.innerHTML = '';
 
-    // Personal hours
     const ph = document.createElement('div');
     ph.className = 'agg-section';
     const maxH = Math.max(...State.staff.map(s => result.personalHours[s.id]?.total || 0), 1);
@@ -364,7 +354,6 @@ function openAggregateModal() {
     </table>`;
     body.appendChild(ph);
 
-    // Day totals
     const dt = document.createElement('div');
     dt.className = 'agg-section';
     const days = result.days;
@@ -374,12 +363,12 @@ function openAggregateModal() {
       <tbody>${days.map((d, i) => {
         const dk = dayKeyFromDate(d);
         const h = result.dayTotals[dk] || 0;
-        return `<tr><td>${DAY_NAMES[i]}</td><td>${formatDate(d)}</td><td>${h.toFixed(1)}h</td></tr>`;
+        const dayIdx = d.getDay();
+        return `<tr><td>${DAY_NAMES[dayIdx]}</td><td>${formatDate(d)}</td><td>${h.toFixed(1)}h</td></tr>`;
     }).join('')}</tbody>
     </table>`;
     body.appendChild(dt);
 
-    // Role counts
     const rc = document.createElement('div');
     rc.className = 'agg-section';
     rc.innerHTML = `<div class="agg-section-title">🏥 職種別人数（日別）</div>
@@ -388,12 +377,12 @@ function openAggregateModal() {
       <tbody>${days.map((d, i) => {
         const dk = dayKeyFromDate(d);
         const rc2 = result.roleCounts[dk] || {};
-        return `<tr><td style="text-align:left;">${DAY_NAMES[i]} ${formatDate(d)}</td><td style="text-align:center;">${rc2.dr || 0}</td><td style="text-align:center;">${rc2.dh || 0}</td><td style="text-align:center;">${rc2.da || 0}</td><td style="text-align:center;font-weight:normal;">${rc2.reception || 0}</td></tr>`;
+        const dayIdx = d.getDay();
+        return `<tr><td style="text-align:left;">${DAY_NAMES[dayIdx]} ${formatDate(d)}</td><td style="text-align:center;">${rc2.dr || 0}</td><td style="text-align:center;">${rc2.dh || 0}</td><td style="text-align:center;">${rc2.da || 0}</td><td style="text-align:center;font-weight:normal;">${rc2.reception || 0}</td></tr>`;
     }).join('')}</tbody>
     </table>`;
     body.appendChild(rc);
 
-    // Unit hours
     const uh = document.createElement('div');
     uh.className = 'agg-section';
     const maxUH = Math.max(...Array.from({ length: TOTAL_UNITS }, (_, i) => result.unitHours[`u${i + 1}`] || 0), 1);
@@ -412,7 +401,7 @@ function openAggregateModal() {
     openModal('modal-aggregate');
 }
 
-// ------ 環境設定 (アプリ全般) ------
+// ------ 環境設定 ------
 function setupAppSettings() {
     document.getElementById('btn-app-settings')?.addEventListener('click', () => {
         const modal = document.getElementById('modal-app-settings');
@@ -427,148 +416,87 @@ function setupAppSettings() {
         const display = document.getElementById('data-size-display');
         if (display) {
             display.textContent = `${info.kb} KB`;
-            // 9KB (GAS Script Properties Limit) を警告基準にする
-            if (info.bytes > 9000) display.style.color = 'var(--danger)';
-            else if (info.bytes > 7000) display.style.color = 'var(--warning)';
-            else display.style.color = 'var(--success)';
+            display.style.color = info.bytes > 9000 ? 'var(--danger)' : (info.bytes > 7000 ? 'var(--warning)' : 'var(--success)');
         }
     }
 
     document.getElementById('btn-cleanup-start')?.addEventListener('click', () => {
         const months = parseInt(document.getElementById('cleanup-months').value, 10);
-        if (confirm(`${months}ヶ月以上前のシフト・休暇データを削除しますか？\n(この操作は取り消せません)`)) {
+        if (confirm(`${months}ヶ月以上前のシフト・休暇データを削除しますか？`)) {
             const removed = cleanupOldData(months);
             updateDataSizeDisplay();
-            showToast('success', 'クリーンアップ完了', `${removed}週分のデータを削除しました。再度「保存」を行ってください。`);
+            showToast('success', 'クリーンアップ完了', `${removed}週分のデータを削除しました。`);
         }
     });
 
     document.getElementById('btn-app-settings-save')?.addEventListener('click', () => {
         const val = parseInt(document.getElementById('input-total-units').value, 10);
-        if (isNaN(val) || val < 1 || val > 50) {
-            showToast('error', '設定エラー', 'ユニット数は1〜50の間で指定してください。');
-            return;
-        }
-
+        if (isNaN(val) || val < 1 || val > 50) { showToast('error', '設定エラー', '1〜50の間で指定してください。'); return; }
         TOTAL_UNITS = val;
         localStorage.setItem(LS_KEYS.totalUnits, TOTAL_UNITS.toString());
-
         closeModal('modal-app-settings');
-        showToast('success', '設定保存', '環境設定を保存しました。画面を再構築します。');
-
-        if (typeof buildTimeline === 'function') {
-            buildTimeline(currentWeekKey(), currentDayKey());
-        }
+        showToast('success', '設定保存', '環境設定を保存しました。');
+        if (typeof buildTimeline === 'function') buildTimeline(currentWeekKey(), currentDayKey());
     });
-
-    const closeBtn = document.getElementById('close-app-settings');
-    if (closeBtn) {
-        closeBtn.addEventListener('click', () => closeModal('modal-app-settings'));
-    }
 }
 
-// ------ テンプレ保存 ------
+// ------ テンプレ保存/適用 ------
 function openTemplateSaveModal() {
     const name = prompt('テンプレート名を入力してください：');
     if (!name) return;
     const wk = currentWeekKey();
-
-    // 現在の表示週の日付配列を取得し、dayKey(例えば YYYY-MM-DD)のリストを作る
     const currentDays = getDayDates(State.currentWeekStart).map(dayKeyFromDate);
-
-    // 保存用データ（日付依存のキー(YYYY-MM-DD)からインデックス(0~6)に変換して保存する）
     const shiftTpl = {};
     const recTpl = {};
-
     const sourceShifts = State.weekShifts[wk] || {};
     const sourceRec = State.receptionShifts[wk] || {};
-
     currentDays.forEach((dk, index) => {
-        if (sourceShifts[dk]) {
-            shiftTpl[index] = JSON.parse(JSON.stringify(sourceShifts[dk]));
-        }
-        if (sourceRec[dk]) {
-            recTpl[index] = JSON.parse(JSON.stringify(sourceRec[dk]));
-        }
+        if (sourceShifts[dk]) shiftTpl[index] = JSON.parse(JSON.stringify(sourceShifts[dk]));
+        if (sourceRec[dk]) recTpl[index] = JSON.parse(JSON.stringify(sourceRec[dk]));
     });
-
-    State.templates[name] = {
-        shifts: shiftTpl,
-        reception: recTpl,
-    };
+    State.templates[name] = { shifts: shiftTpl, reception: recTpl };
     saveAll();
     showToast('success', 'テンプレ保存', `「${name}」として保存しました。`);
 }
 
-// ------ テンプレ適用 ------
 function openTemplateApplyModal() {
     const names = Object.keys(State.templates);
     if (names.length === 0) { showToast('info', 'テンプレなし', '保存されたテンプレートがありません。'); return; }
-    const name = names.length === 1 ? names[0] : prompt(`テンプレートを選択してください：\n${names.map((n, i) => `${i + 1}. ${n}`).join('\n')}\n番号またはそのまま名前を入力：`);
+    const name = names.length === 1 ? names[0] : prompt(`テンプレートを選択：\n${names.map((n, i) => `${i + 1}. ${n}`).join('\n')}`);
     if (!name) return;
     const tpl = State.templates[name] || State.templates[names[parseInt(name) - 1]];
-    if (!tpl) { showToast('error', 'エラー', 'テンプレートが見つかりません。'); return; }
-    if (!confirm(`「${name}」を今週に適用しますか？（現在のシフトは上書きされます）`)) return;
+    if (!tpl) { showToast('error', 'エラー', '見つかりません。'); return; }
+    if (!confirm(`「${name}」を今週に適用しますか？`)) return;
 
     const wk = currentWeekKey();
     const currentDays = getDayDates(State.currentWeekStart).map(dayKeyFromDate);
-
     State.weekShifts[wk] = {};
     State.receptionShifts[wk] = {};
 
-    // tpl.shifts / tpl.reception は { '0': {u1: []...}, '1': ...} のようにインデックスで持っていると仮定
-    // 日付キー(YYYY-MM-DD)だった古いテンプレートの互換性のため両方対応する
-
-    const isOldFormat = Object.keys(tpl.shifts || {}).some(k => k.includes('-'));
-    let sortedKeys;
-    if (isOldFormat) {
-        // 古い形式(YYYY-MM-DD)ならソートして月〜日の順にする
-        sortedKeys = Object.keys(tpl.shifts || {}).sort();
-    } else {
-        // 新しい形式(0~6)なら 0~6 の順
-        sortedKeys = ['0', '1', '2', '3', '4', '5', '6'];
-    }
-
     currentDays.forEach((dk, index) => {
-        const srcKey = isOldFormat ? sortedKeys[index] : index.toString();
         const holidayName = getHolidayName(dk);
-
         if (holidayName) {
-            // 祝日の場合はスキップ（空にする）
             State.weekShifts[wk][dk] = {};
             State.receptionShifts[wk][dk] = { am: [], pm: [] };
         } else {
-            if (tpl.shifts && tpl.shifts[srcKey]) {
-                State.weekShifts[wk][dk] = JSON.parse(JSON.stringify(tpl.shifts[srcKey]));
-                // Regenerate shift IDs
-                Object.values(State.weekShifts[wk][dk]).forEach(unitShifts => {
-                    if (Array.isArray(unitShifts)) {
-                        unitShifts.forEach(sh => {
-                            sh.id = newShiftId();
-                        });
-                    }
-                });
+            if (tpl.shifts && tpl.shifts[index]) {
+                State.weekShifts[wk][dk] = JSON.parse(JSON.stringify(tpl.shifts[index]));
+                Object.values(State.weekShifts[wk][dk]).forEach(arr => { if (Array.isArray(arr)) arr.forEach(sh => sh.id = newShiftId()); });
             } else {
                 State.weekShifts[wk][dk] = {};
             }
-
-            if (tpl.reception && tpl.reception[srcKey]) {
-                State.receptionShifts[wk][dk] = JSON.parse(JSON.stringify(tpl.reception[srcKey]));
-            } else {
-                State.receptionShifts[wk][dk] = { am: [], pm: [] };
-            }
+            if (tpl.reception && tpl.reception[index]) State.receptionShifts[wk][dk] = JSON.parse(JSON.stringify(tpl.reception[index]));
+            else State.receptionShifts[wk][dk] = { am: [], pm: [] };
         }
     });
 
     saveAll();
-    const dk = currentDayKey();
-    buildTimeline(wk, dk);
+    buildTimeline(wk, currentDayKey());
     showToast('success', 'テンプレ適用', `「${name}」を適用しました。`);
 }
 
 // ------ 週間シフトサマリー ------
 let _weeklySummaryVisible = false;
-
 function toggleWeeklySummary() {
     _weeklySummaryVisible = !_weeklySummaryVisible;
     const panel = document.getElementById('weekly-summary');
@@ -576,156 +504,131 @@ function toggleWeeklySummary() {
     if (!panel) return;
     if (_weeklySummaryVisible) {
         panel.style.display = 'flex';
-        btn && btn.classList.add('active');
+        btn?.classList.add('active');
         renderWeeklySummary();
     } else {
         panel.style.display = 'none';
-        btn && btn.classList.remove('active');
+        btn?.classList.remove('active');
     }
 }
 
 function renderWeeklySummary() {
-    const body = document.getElementById('weekly-summary-body');
-    if (!body) return;
-    body.innerHTML = '';
+    const container = document.getElementById('weekly-summary-body');
+    if (!container) return;
+    container.innerHTML = '';
 
-    const wk = currentWeekKey();
-    const days = getDayDates(State.currentWeekStart);
+    // 週間表のみ「月曜始まり」にする (日曜始まりの currentWeekStart に +1日)
+    const mon = new Date(State.currentWeekStart);
+    mon.setDate(mon.getDate() + 1); 
+    const days = getDayDates(mon); 
     const dayKeys = days.map(d => dayKeyFromDate(d));
+
     const roleOrder = ['dr', 'da', 'dh', 'reception'];
-    const roleLabels = { dr: 'Dr', dh: 'DH', da: 'DA', reception: 'TC' };
-
-    // Build table
-    const table = document.createElement('table');
-    table.className = 'weekly-table';
-
-    // Header row: スタッフ名 + 月火水木金土(日)
-    const thead = document.createElement('thead');
-    const headerRow = document.createElement('tr');
-    const thStaff = document.createElement('th');
-    thStaff.className = 'staff-col';
-    thStaff.textContent = 'スタッフ';
-    headerRow.appendChild(thStaff);
-
-    days.forEach((d, i) => {
-        const th = document.createElement('th');
-        const dk = dayKeyFromDate(d);
-        const hName = getHolidayName(dk);
-        let cls = i === 6 ? 'sat' : i === 0 ? 'sun' : '';
-        if (hName) cls = 'holiday-col';
-        if (cls) th.className = cls;
-        th.innerHTML = `${DAY_NAMES[i]}<br><span style="font-weight:400;font-size:9px">${formatDate(d)}</span>${hName ? `<br><span style="font-size:8px;color:#dc2626;font-weight:700">${hName}</span>` : ''}`;
-        headerRow.appendChild(th);
-    });
-    thead.appendChild(headerRow);
-    table.appendChild(thead);
-
-    const tbody = document.createElement('tbody');
+    const roleLabels = { dr: 'Dr（歯科医師）', dh: 'DH（衛生士）', da: 'DA（助手・受付）', reception: 'TC' };
 
     roleOrder.forEach(role => {
         const members = State.staff.filter(s => s.role === role);
         if (members.length === 0) return;
 
-        // Role section header
-        const roleHeaderRow = document.createElement('tr');
-        roleHeaderRow.className = 'weekly-role-header';
-        const roleHeaderCell = document.createElement('td');
-        roleHeaderCell.colSpan = days.length + 1;
-        roleHeaderCell.textContent = roleLabels[role];
-        roleHeaderRow.appendChild(roleHeaderCell);
-        tbody.appendChild(roleHeaderRow);
+        // 職種タイトル
+        const h3 = document.createElement('h3');
+        h3.style.cssText = 'margin:12px 4px 6px; font-size:11px; color:var(--text-secondary); border-left:3px solid var(--accent); padding-left:8px;';
+        h3.textContent = roleLabels[role];
+        container.appendChild(h3);
 
+        const table = document.createElement('table');
+        table.className = 'weekly-table';
+        table.style.marginBottom = '20px';
+        
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        const thStaff = document.createElement('th');
+        thStaff.className = 'staff-col';
+        thStaff.textContent = 'スタッフ';
+        headerRow.appendChild(thStaff);
+
+        days.forEach(d => {
+            const th = document.createElement('th');
+            const dk = dayKeyFromDate(d);
+            const dayIdx = d.getDay(); 
+            let cls = dayIdx === 0 ? 'sun' : (dayIdx === 6 ? 'sat' : '');
+            const hName = getHolidayName(dk);
+            if (hName) cls = 'holiday-col';
+            if (cls) th.className = cls;
+            th.innerHTML = `${DAY_NAMES[dayIdx]}<br><span style="font-weight:400;font-size:9px">${formatDate(d)}</span>`;
+            headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        const tbody = document.createElement('tbody');
         members.forEach(staff => {
             const tr = document.createElement('tr');
-
-            // Staff name cell
             const nameTd = document.createElement('td');
             nameTd.className = 'staff-name-cell';
-            nameTd.title = staff.name;
             nameTd.innerHTML = `<span style="display:inline-flex;align-items:center;gap:3px"><span style="width:7px;height:7px;border-radius:50%;background:${staff.color};flex-shrink:0;display:inline-block"></span>${staff.name.split(' ').pop()}</span>`;
             tr.appendChild(nameTd);
 
-            // Each day
             dayKeys.forEach((dk, i) => {
                 const td = document.createElement('td');
+                const d = days[i];
+                const targetWk = weekKeyFromDate(getWeekStart(d));
+                const dayIdx = d.getDay();
                 const hName = getHolidayName(dk);
-                let cls = i === 6 ? 'sat' : i === 0 ? 'sun' : '';
+                let cls = dayIdx === 6 ? 'sat' : dayIdx === 0 ? 'sun' : '';
                 if (hName) cls = 'holiday-col';
                 if (cls) td.className = cls;
 
-                // 祝日（休診）は最優先表示
                 if (hName) {
                     td.style.background = 'rgba(220,38,38,0.06)';
                     td.style.textAlign = 'center';
                     td.innerHTML = `<span style="font-size:9px;color:#dc2626;font-weight:600">🎌 休診</span>`;
-                    tr.appendChild(td);
-                    return;
-                }
-                // Find shifts for this staff on this day
-                let isWorking = false;
-                for (let u = 1; u <= TOTAL_UNITS; u++) {
-                    const arr = getUnitShifts(wk, dk, u);
-                    for (const sh of arr) {
-                        const ids = [sh.doctorId, ...(sh.dhIds || []), ...(sh.daIds || []), ...(sh.tcIds || [])];
-                        if (ids.includes(staff.id)) { isWorking = true; break; }
-                    }
-                    if (isWorking) break;
-                }
-
-                // 有給・振休・振出チェック
-                const leaveType = getLeaveRecord(wk, staff.id, dk);
-                td.style.textAlign = 'center';
-
-                if (leaveType === 'paid') {
-                    td.style.background = 'rgba(249,115,22,0.12)';
-                    td.innerHTML = `<span class="leave-badge leave-paid" title="有給">🏖️ 有給</span>`;
-                } else if (leaveType === 'happy') {
-                    td.style.background = 'rgba(139,92,246,0.12)';
-                    td.innerHTML = `<span class="leave-badge leave-happy" title="ハッピーマンデー">🎌 HM</span>`;
-                } else if (leaveType === 'other-vibkyuu') {
-                    td.style.background = 'rgba(6,182,212,0.12)';
-                    td.innerHTML = `<span class="leave-badge leave-vibkyuu" title="その他休暇">😴 休暇</span>`;
-                } else if (leaveType === 'comz-vibshutu') {
-                    td.style.background = 'rgba(16,185,129,0.12)';
-                    td.innerHTML = `<span class="leave-badge leave-comz" title="振出(木)">🌳 振出</span>`;
-                } else if (leaveType === 'other-vibshutu') {
-                    td.style.background = 'rgba(20,184,166,0.12)';
-                    td.innerHTML = `<span class="leave-badge leave-vibshutu" title="その他出勤">🔁 出勤</span>`;
-                } else if (isWorking) {
-                    td.style.background = colorWithAlpha(staff.color, 0.15);
-                    td.innerHTML = `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${staff.color};margin:auto"></span>`;
                 } else {
-                    td.style.color = '#ccc';
-                    td.textContent = '—';
-                }
+                    let isWorking = false;
+                    for (let u = 1; u <= TOTAL_UNITS; u++) {
+                        const arr = getUnitShifts(targetWk, dk, u);
+                        for (const sh of arr) {
+                            if ([sh.doctorId, ...(sh.dhIds || []), ...(sh.daIds || []), ...(sh.tcIds || [])].includes(staff.id)) { isWorking = true; break; }
+                        }
+                        if (isWorking) break;
+                    }
 
+                    const leaveType = getLeaveRecord(targetWk, staff.id, dk);
+                    td.style.textAlign = 'center';
+                    if (leaveType) {
+                        const l = LEAVE_TYPES[leaveType] || { label: '休暇', bg: 'var(--bg)' };
+                        td.style.background = l.bg;
+                        td.innerHTML = `<span class="leave-badge ${l.cls}">${l.shortLabel || l.label}</span>`;
+                    } else if (isWorking) {
+                        td.style.background = colorWithAlpha(staff.color, 0.15);
+                        td.innerHTML = `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${staff.color};margin:auto"></span>`;
+                    } else {
+                        td.style.color = '#ccc';
+                        td.textContent = '—';
+                    }
+                }
                 tr.appendChild(td);
             });
-
             tbody.appendChild(tr);
         });
+        table.appendChild(tbody);
+        container.appendChild(table);
     });
-
-    table.appendChild(tbody);
-    body.appendChild(table);
 }
 
 // ------ 休暇管理モーダル ------
 function openLeaveModal() {
+    const container = document.getElementById('leave-grid-container');
+    if (!container) return;
+    container.innerHTML = '';
     const wk = currentWeekKey();
-    const days = getDayDates(State.currentWeekStart);
+    const days = getDayDates(State.currentWeekStart); 
     const dayKeys = days.map(d => dayKeyFromDate(d));
     const roleOrder = ['dr', 'da', 'dh', 'reception'];
     const roleLabels = { dr: 'Dr', dh: 'DH', da: 'DA', reception: 'TC' };
 
-    const container = document.getElementById('leave-grid-container');
-    if (!container) return;
-    container.innerHTML = '';
-
     const table = document.createElement('table');
     table.className = 'leave-table';
-
-    // ヘッダー行
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
     const thStaff = document.createElement('th');
@@ -736,83 +639,48 @@ function openLeaveModal() {
     days.forEach((d, i) => {
         const th = document.createElement('th');
         th.style.cssText = 'text-align:center;padding:6px 4px;min-width:80px;position:sticky;top:0;background:var(--bg);z-index:10;border-bottom:1px solid var(--border);';
-        const cls = i === 6 ? 'color:#3b82f6' : i === 0 ? 'color:#ef4444' : '';
-        th.innerHTML = `<span style="${cls}">${DAY_NAMES[i]}<br><span style="font-size:10px;font-weight:400">${formatDate(d)}</span></span>`;
+        const dayIdx = d.getDay();
+        const cls = dayIdx === 6 ? 'color:#3b82f6' : (dayIdx === 0 ? 'color:#ef4444' : '');
+        th.innerHTML = `<span style="${cls}">${DAY_NAMES[dayIdx]}<br><span style="font-size:10px;font-weight:400">${formatDate(d)}</span></span>`;
         headerRow.appendChild(th);
     });
     thead.appendChild(headerRow);
     table.appendChild(thead);
 
     const tbody = document.createElement('tbody');
-
     roleOrder.forEach(role => {
         const members = State.staff.filter(s => s.role === role);
         if (members.length === 0) return;
-
-        // 職種ヘッダー行
         const roleRow = document.createElement('tr');
         const roleCell = document.createElement('td');
         roleCell.colSpan = days.length + 1;
-        roleCell.style.cssText = 'background:var(--bg-secondary);font-size:10px;font-weight:600;padding:4px 8px;color:var(--text-muted);letter-spacing:.05em;';
+        roleCell.style.cssText = 'background:var(--bg-secondary);font-size:10px;font-weight:600;padding:4px 8px;color:var(--text-muted);';
         roleCell.textContent = roleLabels[role];
         roleRow.appendChild(roleCell);
         tbody.appendChild(roleRow);
 
         members.forEach(staff => {
             const tr = document.createElement('tr');
-
-            // 名前セル
             const nameTd = document.createElement('td');
             nameTd.style.cssText = 'padding:4px 8px;font-size:12px;white-space:nowrap;';
-            nameTd.innerHTML = `<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:${staff.color};flex-shrink:0"></span>${staff.name}</span>`;
+            nameTd.innerHTML = `<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:${staff.color}"></span>${staff.name}</span>`;
             tr.appendChild(nameTd);
 
-            // 曜日セル
             dayKeys.forEach(dk => {
                 const td = document.createElement('td');
                 td.style.cssText = 'padding:3px 4px;text-align:center;';
-
                 const sel = document.createElement('select');
                 sel.className = 'leave-select';
-                sel.innerHTML = `
-                    <option value="">&#x2014; 通常出勤</option>
-                    <option value="paid">🏖️ 有給</option>
-                    <option value="happy">🎌 ハッピーマンデー</option>
-                    <option value="other-vibkyuu">😴 その他休暇</option>
-                    <option value="comz-vibshutu">🌳 コムズ振出</option>
-                    <option value="other-vibshutu">🔁 その他出勤</option>
-                `;
+                sel.innerHTML = `<option value="">&#x2014; 通常出勤</option>` + Object.keys(LEAVE_TYPES).map(t => `<option value="${t}">${LEAVE_TYPES[t].label}</option>`).join('');
                 const current = getLeaveRecord(wk, staff.id, dk);
                 if (current) sel.value = current;
-
-                const leaveColors = {
-                    'paid': 'rgba(249,115,22,0.15)',
-                    'happy': 'rgba(139,92,246,0.15)',
-                    'other-vibkyuu': 'rgba(6,182,212,0.15)',
-                    'comz-vibshutu': 'rgba(16,185,129,0.15)',
-                    'other-vibshutu': 'rgba(20,184,166,0.15)',
-                };
-
-                sel.addEventListener('change', () => {
-                    setLeaveRecord(wk, staff.id, dk, sel.value || null);
-                    saveAll();
-                    if (_weeklySummaryVisible) renderWeeklySummary();
-                    // 当日を表示中の曜日の場合はスタッフパネルも更新
-                    if (dk === currentDayKey()) renderStaffPanel();
-                    td.style.background = leaveColors[sel.value] || '';
-                });
-
-                // 初期カラー
-                if (current) td.style.background = leaveColors[current] || '';
-
+                sel.addEventListener('change', () => { setLeaveRecord(wk, staff.id, dk, sel.value); saveAll(); renderStaffPanel(); });
                 td.appendChild(sel);
                 tr.appendChild(td);
             });
-
             tbody.appendChild(tr);
         });
     });
-
     table.appendChild(tbody);
     container.appendChild(table);
     openModal('modal-leave');
@@ -840,15 +708,13 @@ function openMonthlyModal(year, month) {
     if (!container) return;
     container.innerHTML = '';
 
-    // 月の日数を計算
     const numDays = new Date(_currentMonthlyYear, _currentMonthlyMonth + 1, 0).getDate();
-    const roleOrder = ['dr', 'dh', 'da', 'reception'];
+    const roleOrder = ['dr', 'da', 'dh', 'reception'];
 
     const table = document.createElement('table');
-    table.className = 'weekly-table'; // 既存のスタイルを流用しつつ調整
+    table.className = 'weekly-table'; 
     table.style.minWidth = '1200px';
 
-    // ヘッダー（ユニット名）
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
 
@@ -861,39 +727,32 @@ function openMonthlyModal(year, month) {
 
     for (let u = 1; u <= TOTAL_UNITS; u++) {
         const th = document.createElement('th');
-        // 基本的なユニット名を表示（ここでは1日時点のものか、デフォルト名を表示）
         th.textContent = `U${u}`;
         th.style.minWidth = '90px';
         headerRow.appendChild(th);
     }
-
     thead.appendChild(headerRow);
     table.appendChild(thead);
 
     const tbody = document.createElement('tbody');
-
     for (let day = 1; day <= numDays; day++) {
         const d = new Date(_currentMonthlyYear, _currentMonthlyMonth, day);
         const dk = dayKeyFromDate(d);
         const wk = weekKeyFromDate(getWeekStart(d));
-
         const tr = document.createElement('tr');
 
-        // 日付セル
         const tdDate = document.createElement('td');
         tdDate.className = 'staff-name-cell';
         const dayIdx = d.getDay();
         const hName = getHolidayName(dk);
-
         let dayColor = '';
         if (hName || dayIdx === 0) dayColor = 'color: #dc2626;';
         else if (dayIdx === 6) dayColor = 'color: #3b82f6;';
 
-        tdDate.innerHTML = `<div style="${dayColor} font-weight:700;">${day}日 (${DAY_NAMES[dayIdx === 0 ? 6 : dayIdx - 1]})</div>`;
+        tdDate.innerHTML = `<div style="${dayColor} font-weight:700;">${day}日 (${DAY_NAMES[dayIdx]})</div>`;
         if (hName) tdDate.innerHTML += `<div style="font-size:9px; color:#dc2626; font-weight:700;">${hName}</div>`;
         tr.appendChild(tdDate);
 
-        // 各ユニットのセル
         for (let u = 1; u <= TOTAL_UNITS; u++) {
             const td = document.createElement('td');
             if (hName) td.style.background = 'rgba(220,38,38,0.03)';
@@ -901,9 +760,7 @@ function openMonthlyModal(year, month) {
             else if (dayIdx === 6) td.style.background = 'rgba(99,102,241,0.03)';
 
             const shifts = getUnitShifts(wk, dk, u);
-            // staffList now tracks min start and max end slots
-            // format: { dr: { [staffId]: {start: min_slot, end: max_slot} }, ... }
-            const staffList = { dr: {}, dh: {}, da: {}, reception: {} };
+            const staffList = { dr: {}, da: {}, dh: {}, reception: {} };
 
             const updateStaffTime = (role, id, start, end) => {
                 if (!staffList[role][id]) {
@@ -916,26 +773,22 @@ function openMonthlyModal(year, month) {
 
             shifts.forEach(sh => {
                 if (sh.doctorId) updateStaffTime('dr', sh.doctorId, sh.startSlot, sh.endSlot);
-                (sh.dhIds || []).forEach(id => updateStaffTime('dh', id, sh.startSlot, sh.endSlot));
                 (sh.daIds || []).forEach(id => updateStaffTime('da', id, sh.startSlot, sh.endSlot));
+                (sh.dhIds || []).forEach(id => updateStaffTime('dh', id, sh.startSlot, sh.endSlot));
                 (sh.tcIds || []).forEach(id => updateStaffTime('reception', id, sh.startSlot, sh.endSlot));
             });
 
-            // ユニット内のスタッフを描画
             let html = '';
-            ['dr', 'dh', 'da', 'reception'].forEach(role => {
+            roleOrder.forEach(role => {
                 const sids = Object.keys(staffList[role]);
                 sids.forEach(sid => {
                     const s = getStaff(sid);
                     if (s) {
                         const shiftData = staffList[role][sid];
                         let timeStr = '';
-                        // 9:00〜20:00 でなければ時間を表示
                         if (shiftData.start !== 9 || shiftData.end !== 20) {
-                            // 前の形式に戻しつつ、1行に収まるようサイズ調整
                             timeStr = `<span style="margin-left:2px; font-size:8px; color:#666; font-weight:normal;">(${slotToStr(shiftData.start)}-${slotToStr(shiftData.end)})</span>`;
                         }
-
                         html += `<div style="display:flex; align-items:center; gap:2px; margin-bottom:1px; line-height:1.1; font-size:9px;">
                                    <span style="width:4px;height:4px;border-radius:50%;background:${s.color};display:inline-block;flex-shrink:0;"></span>
                                    <span style="font-weight:700;color:#555;font-size:8px;margin-right:2px;">${ROLES[role].label}</span>
@@ -947,10 +800,8 @@ function openMonthlyModal(year, month) {
             td.innerHTML = html;
             tr.appendChild(td);
         }
-
         tbody.appendChild(tr);
     }
-
     table.appendChild(tbody);
     container.appendChild(table);
     openModal('modal-monthly');

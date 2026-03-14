@@ -247,6 +247,7 @@ function aggregateWeek(weekKey) {
         });
 
         // Set `.size` values into roleCounts
+        const dayIdx = d.getDay();
         roleCounts[dk] = {
             dr: roleSets.dr.size,
             dh: roleSets.dh.size,
