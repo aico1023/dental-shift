@@ -237,6 +237,7 @@ function setupHeaderButtons() {
     document.getElementById('btn-template-apply')?.addEventListener('click', openTemplateApplyModal);
     document.getElementById('btn-aggregate')?.addEventListener('click', openAggregateModal);
     document.getElementById('btn-monthly')?.addEventListener('click', () => openMonthlyModal());
+    document.getElementById('btn-role-monthly')?.addEventListener('click', () => openRoleMonthlyModal());
     // メニュー関連
     const menuBtn = document.getElementById('btn-menu');
     const menuDropdown = document.getElementById('header-menu');
@@ -279,11 +280,24 @@ function setupHeaderButtons() {
     document.getElementById('btn-weekly-close')?.addEventListener('click', toggleWeeklySummary);
     document.getElementById('btn-add-staff')?.addEventListener('click', openStaffAddModal);
     document.getElementById('btn-staff-list')?.addEventListener('click', openStaffListModal);
-    document.getElementById('btn-leave')?.addEventListener('click', openLeaveModal);
+    document.getElementById('btn-leave')?.addEventListener('click', () => openLeaveModal());
     document.getElementById('today-btn')?.addEventListener('click', () => {
         State.currentWeekStart = getWeekStart(new Date());
         State.currentDayIndex = new Date().getDay(); // 今日を選択
         onWeekChange();
+    });
+
+    document.getElementById('btn-leave-prev')?.addEventListener('click', () => {
+        let y = currentLeaveYear;
+        let m = currentLeaveMonth - 1;
+        if (m < 1) { m = 12; y--; }
+        openLeaveModal(y, m);
+    });
+    document.getElementById('btn-leave-next')?.addEventListener('click', () => {
+        let y = currentLeaveYear;
+        let m = currentLeaveMonth + 1;
+        if (m > 12) { m = 1; y++; }
+        openLeaveModal(y, m);
     });
 
     // ユニット別シフト全削除
@@ -404,13 +418,13 @@ function updateSyncHeaderIcon() {
 
 // ------ モーダルclose設定 ------
 function setupModalClosers() {
-    ['modal-staff', 'modal-staff-list', 'modal-aggregate', 'modal-monthly', 'modal-shift-edit', 'modal-leave', 'modal-sync', 'modal-app-settings'].forEach(setupModalClose);
+    ['modal-staff', 'modal-staff-list', 'modal-aggregate', 'modal-monthly', 'modal-role-monthly', 'modal-shift-edit', 'modal-leave', 'modal-sync', 'modal-app-settings'].forEach(setupModalClose);
 }
 
 // ------ キーボードショートカット ------
 document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
-        ['modal-staff', 'modal-staff-list', 'modal-aggregate', 'modal-monthly', 'modal-shift-edit'].forEach(closeModal);
+        ['modal-staff', 'modal-staff-list', 'modal-aggregate', 'modal-monthly', 'modal-role-monthly', 'modal-shift-edit'].forEach(closeModal);
         closeContextMenu();
     }
     if ((e.ctrlKey || e.metaKey) && e.key === 's') {
@@ -428,9 +442,9 @@ document.addEventListener('keydown', e => {
 });
 
 // ------ モーダル印刷 (別ウィンドウ方式) ------
-window.printModal = function () {
-    const container = document.getElementById('monthly-table-container');
-    const title = document.getElementById('monthly-title')?.textContent || '月間ユニット表';
+window.printModal = function (containerId = 'monthly-table-container', titleId = 'monthly-title') {
+    const container = document.getElementById(containerId);
+    const title = document.getElementById(titleId)?.textContent || '月間シフト表';
     if (!container) return;
 
     // 印刷用の新しいウィンドウを開く

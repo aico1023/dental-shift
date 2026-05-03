@@ -7,7 +7,7 @@
   --bg: #f8fafc;
   --surface: #ffffff;
   --surface-hover: #f1f5f9;
-  --border: #e2e8f0;
+  --border: #cbd5e1;
   --border-light: #f1f5f9;
   --text-primary: #1e293b;
   --text-secondary: #475569;
@@ -1752,16 +1752,16 @@ ol {
   }
 
   .weekly-table {
-    border: 1px solid #ccc !important;
+    border: 1px solid #94a3b8 !important;
   }
 
   .weekly-table th, .weekly-table td {
-    border: 1px solid #eee !important;
+    border: 1px solid #cbd5e1 !important;
   }
 
   .shift-block {
     box-shadow: none !important;
-    border: 1px solid rgba(0,0,0,0.1) !important;
+    border: 1px solid rgba(0,0,0,0.2) !important;
   }
 }
 
@@ -2199,4 +2199,69 @@ ol {
   padding: 16px;
   background: var(--surface-hover);
   margin-top: 20px;
+}
+
+/* ============================================================
+   Print Styles (印刷用設定)
+   ============================================================ */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 5mm;
+  }
+
+  /* 背景色を印刷に出す設定 */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* メイン画面を完全に非表示 */
+  #app, .modal-backdrop, .toast-container {
+    display: none !important;
+  }
+
+  /* モーダル表示のみを印刷対象にする */
+  .modal.open {
+    display: block !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+    z-index: 9999 !important;
+  }
+
+  .modal-content {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+
+  .modal-header, .modal-footer, .btn-monthly-prev, .btn-monthly-next, #btn-monthly-prev, #btn-monthly-next {
+    display: none !important; /* ボタンなどは不要 */
+  }
+
+  /* 月間ユニット表の縮小率設定 (62%) */
+  .monthly-unit-table {
+    zoom: 0.62 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    border-collapse: collapse !important;
+    table-layout: fixed !important;
+  }
+
+  /* 月間表の枠線を濃く */
+  .monthly-table, .weekly-table {
+    border: 2px solid #000 !important;
+  }
+  .monthly-table th, .monthly-table td, .weekly-table th, .weekly-table td {
+    border: 1px solid #333 !important;
+    color: #000 !important;
+  }
 }

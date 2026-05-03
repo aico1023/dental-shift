@@ -82,7 +82,7 @@ function checkDrlessWarnings(weekKey, dayKey) {
 function checkLeaveConflicts(weekKey, dayKey) {
     const conflicts = new Set(); // shiftId
     const dayShifts = getDayShifts(weekKey, dayKey);
-    const leaveTypesToFlag = ['paid', 'happy', 'other-vibkyuu'];
+    const leaveTypesToFlag = ['paid', 'happy', 'other-vibkyuu', 'normal-leave'];
 
     for (let u = 1; u <= TOTAL_UNITS; u++) {
         const arr = getUnitShifts(weekKey, dayKey, u);
@@ -114,7 +114,7 @@ function checkLeaveConflicts(weekKey, dayKey) {
 // 出勤（振出）なのにシフトがないチェック
 function checkAttendanceRequirements(weekKey, dayKey) {
     const missingShiftStaff = new Set(); // staffId
-    const attendanceTypes = ['comz-vibshutu', 'other-vibshutu'];
+    const attendanceTypes = ['working-day', 'comz-vibshutu', 'other-vibshutu'];
 
     // 振出設定されているスタッフを抽出
     State.staff.forEach(s => {

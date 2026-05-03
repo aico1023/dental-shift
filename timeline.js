@@ -310,9 +310,9 @@ function renderShiftBlock(sh, unitNum, validation) {
         html += '</div>';
     } else if (sh.dhIds && sh.dhIds.length > 0) {
         const dh = getStaff(sh.dhIds[0]);
-        html += `<div class="block-name">🦷 ${dh ? dh.name : '?'}</div>`;
+        html += `<div class="block-name" style="color:#d97706;">✨ ﾒﾝﾃ: ${dh ? dh.name : '?'}</div>`;
         html += `<div class="block-time">${slotToStr(sh.startSlot)}〜${slotToStr(sh.endSlot)}</div>`;
-        html += `<div class="block-role">DH</div>`;
+        html += `<div class="block-role">DH (メンテナンス)</div>`;
         if (sh.dhIds.length > 1) { // 2人目以降のDHがいれば
             html += `<div class="block-role">追加DH: ${renderNames(sh.dhIds.slice(1), 'dh')}</div>`;
         }

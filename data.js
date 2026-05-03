@@ -183,6 +183,7 @@ const KEY_MAP = {
   templates: 'tm',
   staff: 'st',
   customHolidays: 'ch',
+  totalUnits: 'tu',
   // Shift objects
   doctorId: 'di',
   dhIds: 'dh',
@@ -285,7 +286,8 @@ function getDataSizeInfo() {
     templates: State.templates,
     unitNames: State.unitNames,
     leaveRecords: State.leaveRecords,
-    customHolidays: State.customHolidays
+    customHolidays: State.customHolidays,
+    totalUnits: TOTAL_UNITS
   };
   // クラウド保存時のサイズを基準にする（最適化後）
   const optimized = optimizeState(currentState);
@@ -322,9 +324,9 @@ function cleanupOldData(months) {
   });
 
   // Cleanup unitNames
-  Object.keys(State.unitNames).forEach(dk => {
-    if (dk < thresholdStr) {
-      delete State.unitNames[dk];
+  Object.keys(State.unitNames).forEach(k => {
+    if (isNaN(k) && k < thresholdStr) {
+      delete State.unitNames[k];
     }
   });
 
@@ -349,7 +351,8 @@ function saveAll() {
     templates: State.templates,
     unitNames: State.unitNames,
     leaveRecords: State.leaveRecords,
-    customHolidays: State.customHolidays
+    customHolidays: State.customHolidays,
+    totalUnits: TOTAL_UNITS
   };
 
   try {
@@ -422,6 +425,10 @@ function loadAll(forceCloud = false) {
           State.unitNames = deoptimized.unitNames || {};
           State.leaveRecords = deoptimized.leaveRecords || {};
           State.customHolidays = deoptimized.customHolidays || {};
+          if (deoptimized.totalUnits !== undefined) {
+            TOTAL_UNITS = deoptimized.totalUnits;
+            localStorage.setItem(LS_KEYS.totalUnits, TOTAL_UNITS.toString());
+          }
           showToast('success', '同期完了', 'クラウドの最新データを反映しました');
           return true;
         } else {
