@@ -763,6 +763,11 @@ ol {
   color: #854d0e;
 }
 
+.badge-dt {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
 .badge-reception {
   background: #f3e8ff;
   color: #6b21a8;

@@ -13,14 +13,15 @@ const ROLES = {
   dr: { label: 'Dr', badge: 'badge-dr' },
   dh: { label: 'DH', badge: 'badge-dh' },
   da: { label: 'DA', badge: 'badge-da' },
+  dt: { label: 'DT', badge: 'badge-dt' },
   reception: { label: 'TC', badge: 'badge-reception' },
 };
 
 // ---- Default sample staff ----
 const DEFAULT_STAFF = [
-  { id: 's1', name: '田中 一郎', role: 'dr', team: 'A', color: '#4f7ef8', employment: 'fulltime', assistCapacity: 1 },
-  { id: 's2', name: '鈴木 花子', role: 'dr', team: 'B', color: '#7c5cfc', employment: 'fulltime', assistCapacity: 1 },
-  { id: 's3', name: '佐藤 次郎', role: 'dr', team: 'A', color: '#ec4899', employment: 'parttime', assistCapacity: 1 },
+  { id: 's1', name: '田中 一郎', role: 'dr', team: 'A', color: '#4f7ef8', employment: 'fulltime', assistCapacity: 1, needsAssistant: true },
+  { id: 's2', name: '鈴木 花子', role: 'dr', team: 'B', color: '#7c5cfc', employment: 'fulltime', assistCapacity: 1, needsAssistant: true },
+  { id: 's3', name: '佐藤 次郎', role: 'dr', team: 'A', color: '#ec4899', employment: 'parttime', assistCapacity: 1, needsAssistant: true },
   { id: 's4', name: '山田 さくら', role: 'dh', team: 'A', color: '#10b981', employment: 'fulltime', assistCapacity: 1 },
   { id: 's5', name: '中村 あい', role: 'dh', team: 'B', color: '#06b6d4', employment: 'fulltime', assistCapacity: 1 },
   { id: 's6', name: '伊藤 みく', role: 'dh', team: 'A', color: '#14b8a6', employment: 'parttime', assistCapacity: 1 },
@@ -189,8 +190,10 @@ const KEY_MAP = {
   dhIds: 'dh',
   daIds: 'da',
   tcIds: 'tc',
+  dtIds: 'dti',
   startSlot: 'ss',
   endSlot: 'es',
+  needsAssistant: 'na',
 };
 
 // Inverse map for deoptimization
@@ -217,6 +220,7 @@ function optimizeState(state) {
               if (sh.dhIds) optSh[KEY_MAP.dhIds] = sh.dhIds;
               if (sh.daIds) optSh[KEY_MAP.daIds] = sh.daIds;
               if (sh.tcIds) optSh[KEY_MAP.tcIds] = sh.tcIds;
+              if (sh.dtIds) optSh[KEY_MAP.dtIds] = sh.dtIds;
               if (sh.startSlot !== undefined) optSh[KEY_MAP.startSlot] = sh.startSlot;
               if (sh.endSlot !== undefined) optSh[KEY_MAP.endSlot] = sh.endSlot;
               return optSh;
@@ -257,6 +261,7 @@ function deoptimizeState(optState) {
               if (sh[KEY_MAP.dhIds]) deoptSh.dhIds = sh[KEY_MAP.dhIds];
               if (sh[KEY_MAP.daIds]) deoptSh.daIds = sh[KEY_MAP.daIds];
               if (sh[KEY_MAP.tcIds]) deoptSh.tcIds = sh[KEY_MAP.tcIds];
+              if (sh[KEY_MAP.dtIds]) deoptSh.dtIds = sh[KEY_MAP.dtIds];
               if (sh[KEY_MAP.startSlot] !== undefined) deoptSh.startSlot = sh[KEY_MAP.startSlot];
               if (sh[KEY_MAP.endSlot] !== undefined) deoptSh.endSlot = sh[KEY_MAP.endSlot];
               return deoptSh;

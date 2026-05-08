@@ -231,7 +231,7 @@ function renderShiftBlock(sh, unitNum, validation) {
             (sh.daIds && sh.daIds[0]) ? getStaff(sh.daIds[0]) : null;
 
     // Determine primary staff
-    let primaryId = sh.doctorId || (sh.dhIds && sh.dhIds[0]) || (sh.daIds && sh.daIds[0]) || (sh.tcIds && sh.tcIds[0]);
+    let primaryId = sh.doctorId || (sh.dhIds && sh.dhIds[0]) || (sh.daIds && sh.daIds[0]) || (sh.tcIds && sh.tcIds[0]) || (sh.dtIds && sh.dtIds[0]);
     const primaryStaff = primaryId ? getStaff(primaryId) : null;
     const color = primaryStaff ? primaryStaff.color : '#888';
 
@@ -344,6 +344,17 @@ function renderShiftBlock(sh, unitNum, validation) {
         html += `<div class="block-name">💁 ${tc ? tc.name : '?'}</div>`;
         html += `<div class="block-time">${slotToStr(sh.startSlot)}〜${slotToStr(sh.endSlot)}</div>`;
         html += `<div class="block-role">TC</div>`;
+        if (sh.tcIds.length > 1) {
+            html += `<div class="block-role">追加TC: ${renderNames(sh.tcIds.slice(1), 'reception')}</div>`;
+        }
+    } else if (sh.dtIds && sh.dtIds.length > 0) {
+        const dt = getStaff(sh.dtIds[0]);
+        html += `<div class="block-name">🦷 ${dt ? dt.name : '?'}</div>`;
+        html += `<div class="block-time">${slotToStr(sh.startSlot)}〜${slotToStr(sh.endSlot)}</div>`;
+        html += `<div class="block-role">DT</div>`;
+        if (sh.dtIds.length > 1) {
+            html += `<div class="block-role">追加DT: ${renderNames(sh.dtIds.slice(1), 'dt')}</div>`;
+        }
     }
 
     // 問題ありの場合、❗バッジを追加 (This is now handled by refreshValidation)
@@ -365,6 +376,10 @@ function renderShiftBlock(sh, unitNum, validation) {
                 sh.dhIds = sh.dhIds.filter(id => id !== staffIdToRemove);
             } else if (role === 'da' && sh.daIds) {
                 sh.daIds = sh.daIds.filter(id => id !== staffIdToRemove);
+            } else if (role === 'dt' && sh.dtIds) {
+                sh.dtIds = sh.dtIds.filter(id => id !== staffIdToRemove);
+            } else if (role === 'reception' && sh.tcIds) {
+                sh.tcIds = sh.tcIds.filter(id => id !== staffIdToRemove);
             }
 
             // 保存して再描画

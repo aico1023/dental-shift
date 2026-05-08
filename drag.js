@@ -42,11 +42,9 @@ function attachDropZones() {
             const staffId = e.dataTransfer.getData('staffId');
             if (!staffId) return;
 
-            const rect = body.getBoundingClientRect();
-            const relY = e.clientY - rect.top;
-            let startSlot = snapSlot(pixelToSlot(relY, TIME_START, ROW_H));
-            startSlot = Math.max(TIME_START, Math.min(startSlot, TIME_END - 0.5));
-            let endSlot = Math.min(startSlot + 1, TIME_END);
+            // デフォルトで 9:00〜20:00 (TIME_START〜TIME_END) に設定
+            let startSlot = TIME_START;
+            let endSlot = TIME_END;
 
             dropStaffOnUnit(staffId, unitNum, startSlot, endSlot, wk, dk);
         });
@@ -60,13 +58,8 @@ function showDropGhost(body, e, unitNum) {
         ghost.className = 'time-ghost';
         body.appendChild(ghost);
     }
-    const rect = body.getBoundingClientRect();
-    const relY = e.clientY - rect.top;
-    const slot = snapSlot(pixelToSlot(relY, TIME_START, ROW_H));
-    const clamped = Math.max(TIME_START, Math.min(slot, TIME_END - 1));
-    const top = slotToPixel(clamped, TIME_START, ROW_H);
-    ghost.style.cssText = `top:${top}px; height:${ROW_H}px;`;
-    ghost.textContent = `${slotToStr(clamped)}〜${slotToStr(clamped + 1)}`;
+    ghost.style.cssText = `top:0px; height:${totalTimelineHeight()}px;`;
+    ghost.textContent = `${slotToStr(TIME_START)}〜${slotToStr(TIME_END)}`;
 }
 
 function removeDropGhost(body) {
@@ -150,17 +143,51 @@ function dropStaffOnUnit(staffId, unitNum, startSlot, endSlot, weekKey, dayKey) 
         }
 
     } else if (staff.role === 'reception') {
-        // TC staff -> new shift on unit
-        const shift = {
-            id: newShiftId(),
-            startSlot, endSlot,
-            doctorId: null,
-            daIds: [],
-            dhIds: [],
-            tcIds: [staffId],
-        };
-        existingArr.push(shift);
-        showToast('success', 'TC配置完了', `${staff.name} を U${unitNum} に配置しました。`);
+        // TC staff -> Check if there's an overlapping TC shift
+        const existingTcShift = existingArr.find(sh =>
+            sh.tcIds && sh.tcIds.length > 0 && slotsOverlap(sh.startSlot, sh.endSlot, startSlot, endSlot)
+        );
+        if (existingTcShift) {
+            if (existingTcShift.tcIds.includes(staffId)) {
+                showToast('warning', '重複', 'このTCはすでに配置されています。'); return;
+            }
+            existingTcShift.tcIds.push(staffId);
+            showToast('success', 'TC追加完了', `${staff.name} を既存のTCシフトに追加しました。`);
+        } else {
+            const shift = {
+                id: newShiftId(),
+                startSlot, endSlot,
+                doctorId: null,
+                daIds: [],
+                dhIds: [],
+                tcIds: [staffId],
+            };
+            existingArr.push(shift);
+            showToast('success', 'TC配置完了', `${staff.name} を U${unitNum} に配置しました。`);
+        }
+    } else if (staff.role === 'dt') {
+        // DT staff -> Check if there's an overlapping DT shift
+        const existingDtShift = existingArr.find(sh =>
+            sh.dtIds && sh.dtIds.length > 0 && slotsOverlap(sh.startSlot, sh.endSlot, startSlot, endSlot)
+        );
+        if (existingDtShift) {
+            if (existingDtShift.dtIds.includes(staffId)) {
+                showToast('warning', '重複', 'このDTはすでに配置されています。'); return;
+            }
+            existingDtShift.dtIds.push(staffId);
+            showToast('success', 'DT追加完了', `${staff.name} を既存のDTシフトに追加しました。`);
+        } else {
+            const shift = {
+                id: newShiftId(),
+                startSlot, endSlot,
+                doctorId: null,
+                daIds: [],
+                dhIds: [],
+                dtIds: [staffId],
+            };
+            existingArr.push(shift);
+            showToast('success', 'DT配置完了', `${staff.name} を U${unitNum} に配置しました。`);
+        }
     }
 
     saveAll();

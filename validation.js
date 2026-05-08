@@ -17,7 +17,7 @@ function checkStaffOverlaps(weekKey, dayKey) {
     for (let u = 1; u <= TOTAL_UNITS; u++) {
         const arr = getUnitShifts(weekKey, dayKey, u);
         arr.forEach(sh => {
-            const staffIds = [sh.doctorId, ...(sh.daIds || []), ...(sh.dhIds || []), ...(sh.tcIds || [])].filter(Boolean);
+            const staffIds = [sh.doctorId, ...(sh.daIds || []), ...(sh.dhIds || []), ...(sh.tcIds || []), ...(sh.dtIds || [])].filter(Boolean);
             staffIds.forEach(sid => {
                 allShifts.push({ shiftId: sh.id, staffId: sid, start: sh.startSlot, end: sh.endSlot });
             });
@@ -45,7 +45,10 @@ function checkDaWarnings(weekKey, dayKey) {
         arr.forEach(sh => {
             const hasAssist = (sh.daIds && sh.daIds.length > 0) || (sh.dhIds && sh.dhIds.length > 0);
             if (sh.doctorId && !hasAssist) {
-                warnings.add(sh.id);
+                const dr = getStaff(sh.doctorId);
+                if (dr && dr.needsAssistant !== false) {
+                    warnings.add(sh.id);
+                }
             }
         });
     }
@@ -87,7 +90,7 @@ function checkLeaveConflicts(weekKey, dayKey) {
     for (let u = 1; u <= TOTAL_UNITS; u++) {
         const arr = getUnitShifts(weekKey, dayKey, u);
         arr.forEach(sh => {
-            const staffIds = [sh.doctorId, ...(sh.daIds || []), ...(sh.dhIds || []), ...(sh.tcIds || [])].filter(Boolean);
+            const staffIds = [sh.doctorId, ...(sh.daIds || []), ...(sh.dhIds || []), ...(sh.tcIds || []), ...(sh.dtIds || [])].filter(Boolean);
             staffIds.forEach(sid => {
                 const leaveType = getLeaveRecord(weekKey, sid, dayKey);
                 if (leaveType && leaveTypesToFlag.includes(leaveType)) {
@@ -129,7 +132,8 @@ function checkAttendanceRequirements(weekKey, dayKey) {
                     String(sh.doctorId) === String(s.id) || 
                     (sh.daIds && sh.daIds.map(String).includes(String(s.id))) || 
                     (sh.dhIds && sh.dhIds.map(String).includes(String(s.id))) || 
-                    (sh.tcIds && sh.tcIds.map(String).includes(String(s.id)))
+                    (sh.tcIds && sh.tcIds.map(String).includes(String(s.id))) ||
+                    (sh.dtIds && sh.dtIds.map(String).includes(String(s.id)))
                 );
                 if (isScheduled) { hasShift = true; break; }
             }
@@ -195,7 +199,7 @@ function aggregateWeek(weekKey) {
         const dk = dayKeyFromDate(d);
 
         // 職種別人数（日別）はユニークなスタッフ数としてカウント
-        const roleSets = { dr: new Set(), dh: new Set(), da: new Set(), reception: new Set() };
+        const roleSets = { dr: new Set(), dh: new Set(), da: new Set(), dt: new Set(), reception: new Set() };
 
         for (let u = 1; u <= TOTAL_UNITS; u++) {
             const arr = getUnitShifts(weekKey, dk, u);
@@ -226,6 +230,7 @@ function aggregateWeek(weekKey) {
                 if (sh.doctorId) { addHours(sh.doctorId); roleSets.dr.add(sh.doctorId); }
                 (sh.daIds || []).forEach(id => { addHours(id); roleSets.da.add(id); });
                 (sh.dhIds || []).forEach(id => { addHours(id); roleSets.dh.add(id); });
+                (sh.dtIds || []).forEach(id => { addHours(id); roleSets.dt.add(id); });
                 (sh.tcIds || []).forEach(id => { addHours(id); roleSets.reception.add(id); });
             });
         }
@@ -252,6 +257,7 @@ function aggregateWeek(weekKey) {
             dr: roleSets.dr.size,
             dh: roleSets.dh.size,
             da: roleSets.da.size,
+            dt: roleSets.dt.size,
             reception: roleSets.reception.size
         };
     });

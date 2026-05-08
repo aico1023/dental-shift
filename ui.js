@@ -1,4 +1,4 @@
-// ============================================================
+﻿// ============================================================
 // ui.js - モーダル・スタッフパネル・トースト・集計・その他UI
 // ============================================================
 
@@ -56,8 +56,8 @@ function renderStaffPanel() {
 
     const wk = currentWeekKey();
     const dk = currentDayKey();
-    const roleOrder = ['dr', 'da', 'dh', 'reception'];
-    const roleLabels = { dr: 'Dr（歯科医師）', dh: 'DH（衛生士）', da: 'DA（助手）', reception: 'TC' };
+    const roleOrder = ['dr', 'da', 'dh', 'dt', 'reception'];
+    const roleLabels = { dr: 'Dr（歯科医師）', dh: 'DH（衛生士）', da: 'DA（助手）', dt: 'DT（技工士）', reception: 'TC' };
 
     const validation = runValidation(wk, dk);
 
@@ -206,9 +206,12 @@ function openStaffAddModal() {
     selectRadio('sm-role', 'dr');
     selectRadio('sm-emp', 'fulltime');
     selectRadio('sm-assist', '1');
+    selectRadio('sm-dr-assist', 'true');
     selectColor(STAFF_COLORS[Math.floor(Math.random() * STAFF_COLORS.length)]);
     const assistRow = document.getElementById('sm-assist-row');
     if (assistRow) assistRow.style.display = 'none';
+    const drAssistRow = document.getElementById('sm-dr-assist-row');
+    if (drAssistRow) drAssistRow.style.display = 'block';
     openModal('modal-staff');
 }
 
@@ -222,9 +225,12 @@ function openStaffEditModal(staffId) {
     selectRadio('sm-role', s.role);
     selectRadio('sm-emp', s.employment || 'fulltime');
     selectRadio('sm-assist', String(s.assistCapacity || 1));
+    selectRadio('sm-dr-assist', String(s.needsAssistant !== false));
     selectColor(s.color || STAFF_COLORS[0]);
     const assistRow = document.getElementById('sm-assist-row');
     if (assistRow) assistRow.style.display = (s.role === 'da' || s.role === 'dh') ? '' : 'none';
+    const drAssistRow = document.getElementById('sm-dr-assist-row');
+    if (drAssistRow) drAssistRow.style.display = (s.role === 'dr') ? 'block' : 'none';
     openModal('modal-staff');
 }
 
@@ -272,6 +278,8 @@ function setupStaffModal() {
             if (group === 'sm-role') {
                 const assistRow = document.getElementById('sm-assist-row');
                 if (assistRow) assistRow.style.display = (btn.dataset.value === 'da' || btn.dataset.value === 'dh') ? '' : 'none';
+                const drAssistRow = document.getElementById('sm-dr-assist-row');
+                if (drAssistRow) drAssistRow.style.display = (btn.dataset.value === 'dr') ? 'block' : 'none';
             }
         });
     });
@@ -282,13 +290,21 @@ function setupStaffModal() {
         const role = getRadioValue('sm-role') || 'dr';
         const emp = getRadioValue('sm-emp') || 'fulltime';
         const assist = parseInt(getRadioValue('sm-assist') || '1');
+        const needsAssistant = getRadioValue('sm-dr-assist') !== 'false';
         const team = document.getElementById('sm-team')?.value.trim() || '';
 
         if (_editingStaffId) {
             const s = getStaff(_editingStaffId);
-            if (s) { s.name = name; s.role = role; s.employment = emp; s.assistCapacity = assist; s.team = team; s.color = _selectedColor; }
+            if (s) { 
+                s.name = name; s.role = role; s.employment = emp; 
+                s.assistCapacity = assist; s.needsAssistant = needsAssistant; 
+                s.team = team; s.color = _selectedColor; 
+            }
         } else {
-            State.staff.push({ id: newStaffId(), name, role, team, color: _selectedColor, employment: emp, assistCapacity: assist });
+            State.staff.push({ 
+                id: newStaffId(), name, role, team, color: _selectedColor, 
+                employment: emp, assistCapacity: assist, needsAssistant: needsAssistant 
+            });
         }
         saveAll();
         renderStaffPanel();
@@ -375,12 +391,12 @@ function openAggregateModal() {
     rc.className = 'agg-section';
     rc.innerHTML = `<div class="agg-section-title">🏥 職種別人数（日別）</div>
     <table class="agg-table">
-      <thead><tr><th style="text-align:left;">曜日</th><th style="text-align:center;">Dr</th><th style="text-align:center;">DH</th><th style="text-align:center;">DA</th><th style="text-align:center;">TC</th></tr></thead>
+      <thead><tr><th style="text-align:left;">曜日</th><th style="text-align:center;">Dr</th><th style="text-align:center;">DH</th><th style="text-align:center;">DA</th><th style="text-align:center;">DT</th><th style="text-align:center;">TC</th></tr></thead>
       <tbody>${days.map((d, i) => {
         const dk = dayKeyFromDate(d);
         const rc2 = result.roleCounts[dk] || {};
         const dayIdx = d.getDay();
-        return `<tr><td style="text-align:left;">${DAY_NAMES[dayIdx]} ${formatDate(d)}</td><td style="text-align:center;">${rc2.dr || 0}</td><td style="text-align:center;">${rc2.dh || 0}</td><td style="text-align:center;">${rc2.da || 0}</td><td style="text-align:center;font-weight:normal;">${rc2.reception || 0}</td></tr>`;
+        return `<tr><td style="text-align:left;">${DAY_NAMES[dayIdx]} ${formatDate(d)}</td><td style="text-align:center;">${rc2.dr || 0}</td><td style="text-align:center;">${rc2.dh || 0}</td><td style="text-align:center;">${rc2.da || 0}</td><td style="text-align:center;">${rc2.dt || 0}</td><td style="text-align:center;font-weight:normal;">${rc2.reception || 0}</td></tr>`;
     }).join('')}</tbody>
     </table>`;
     body.appendChild(rc);
@@ -525,8 +541,8 @@ function renderWeeklySummary() {
     const days = getDayDates(mon); 
     const dayKeys = days.map(d => dayKeyFromDate(d));
 
-    const roleOrder = ['dr', 'da', 'dh', 'reception'];
-    const roleLabels = { dr: 'Dr（歯科医師）', dh: 'DH（衛生士）', da: 'DA（助手・受付）', reception: 'TC' };
+    const roleOrder = ['dr', 'da', 'dh', 'dt', 'reception'];
+    const roleLabels = { dr: 'Dr（歯科医師）', dh: 'DH（衛生士）', da: 'DA（助手）', dt: 'DT（技工士）', reception: 'TC' };
 
     roleOrder.forEach(role => {
         const members = State.staff.filter(s => s.role === role);
@@ -590,7 +606,7 @@ function renderWeeklySummary() {
                     for (let u = 1; u <= TOTAL_UNITS; u++) {
                         const arr = getUnitShifts(targetWk, dk, u);
                         for (const sh of arr) {
-                            if ([sh.doctorId, ...(sh.dhIds || []), ...(sh.daIds || []), ...(sh.tcIds || [])].includes(staff.id)) { isWorking = true; break; }
+                            if ([sh.doctorId, ...(sh.dhIds || []), ...(sh.daIds || []), ...(sh.dtIds || []), ...(sh.tcIds || [])].includes(staff.id)) { isWorking = true; break; }
                         }
                         if (isWorking) break;
                     }
@@ -646,8 +662,7 @@ function openLeaveModal(year, month, role) {
     // タブの描画
     if (tabsEl) {
         tabsEl.innerHTML = '';
-        const roleLabels = { dr: 'Dr', dh: 'DH', da: 'DA', reception: 'TC' };
-        ['dr', 'dh', 'da', 'reception'].forEach(r => {
+        const roleLabels = { dr: 'Dr', dh: 'DH', da: 'DA', tc_dt: 'TC & DT' }; ['dr', 'dh', 'da', 'tc_dt'].forEach(r => {
             const btn = document.createElement('button');
             btn.className = currentLeaveRole === r ? 'btn btn-primary btn-sm' : 'btn btn-ghost btn-sm';
             btn.textContent = roleLabels[r];
@@ -661,10 +676,10 @@ function openLeaveModal(year, month, role) {
     
     const daysInMonth = new Date(currentLeaveYear, currentLeaveMonth, 0).getDate();
     const sortedStaff = State.staff.filter(s => {
-        if (s.role !== currentLeaveRole) return false;
+        if (currentLeaveRole === 'tc_dt') { if (s.role !== 'dt' && s.role !== 'reception') return false; } else { if (s.role !== currentLeaveRole) return false; }
         // 院長2枠と矯正枠は休暇管理から除外（全角半角やスペースの有無を考慮）
         const n = s.name.replace(/\s+/g, '');
-        if (n.includes('院長2') || n.includes('院長２') || n.includes('矯正')) return false;
+        if (n.includes('院長2') || n.includes('院長２') || n.includes('院長3') || n.includes('院長３') || n.includes('Dr2') || n.includes('Dr２') || n.includes('矯正')) return false;
         return true;
     });
 
@@ -795,7 +810,7 @@ function openMonthlyModal(year, month) {
     container.innerHTML = '';
 
     const numDays = new Date(_currentMonthlyYear, _currentMonthlyMonth + 1, 0).getDate();
-    const roleOrder = ['dr', 'da', 'dh', 'reception'];
+    const roleOrder = ['dr', 'da', 'dh', 'dt', 'reception'];
 
     const table = document.createElement('table');
     table.className = 'weekly-table monthly-unit-table'; 
@@ -861,7 +876,7 @@ function openMonthlyModal(year, month) {
             else if (dayIdx === 6) td.style.background = 'rgba(235, 245, 255, 0.6)';
 
             const shifts = getUnitShifts(wk, dk, u);
-            const staffList = { dr: {}, da: {}, dh: {}, reception: {} };
+            const staffList = { dr: {}, da: {}, dh: {}, dt: {}, reception: {} };
 
             const updateStaffTime = (role, id, start, end, isMente = false) => {
                 if (!staffList[role][id]) {
@@ -878,13 +893,14 @@ function openMonthlyModal(year, month) {
                 if (sh.doctorId) updateStaffTime('dr', sh.doctorId, sh.startSlot, sh.endSlot);
                 (sh.daIds || []).forEach(id => updateStaffTime('da', id, sh.startSlot, sh.endSlot));
                 (sh.dhIds || []).forEach(id => updateStaffTime('dh', id, sh.startSlot, sh.endSlot, !hasDr));
+                (sh.dtIds || []).forEach(id => updateStaffTime('dt', id, sh.startSlot, sh.endSlot));
                 (sh.tcIds || []).forEach(id => updateStaffTime('reception', id, sh.startSlot, sh.endSlot));
             });
 
             let html = '<div style="display:flex; flex-direction:column; gap:4px; align-items:stretch;">';
             const generateGroupedChips = (roles, isMenteCheck = false) => {
                 let singleGroup = { staffs: [], hasMente: false, mainColor: null };
-                const rolePriority = { dr: 0, dh: 1, da: 2, reception: 3 };
+                const rolePriority = { dr: 0, dh: 1, da: 2, dt: 3, reception: 4 };
 
                 roles.forEach(role => {
                     const sids = Object.keys(staffList[role]);
@@ -930,12 +946,16 @@ function openMonthlyModal(year, month) {
                 let bottomText = assistNames;
                 if (!drNames && singleGroup.hasMente) {
                     topText = 'メンテ';
+                } else if (!drNames && roles.includes('dt') && assistNames) {
+                    topText = 'ＤＴ';
                 } else if (!drNames && roles.includes('reception') && assistNames) {
                     topText = 'ＴＣ';
                 }
 
-                const topHtml = topText ? `<div style="font-size:12px; font-weight:800; padding-bottom:${bottomText ? '2px' : '0'}; text-align:center;">${topText}</div>` : '';
-                const bottomHtml = bottomText ? `<div style="font-size:11px; font-weight:700; border-top:${topText ? '1px solid ' + border : 'none'}; margin-top:${topText ? '2px' : '0'}; padding-top:${topText ? '2px' : '0'}; text-align:center; color:#111;">${bottomText}</div>` : '';
+                const topHtml = topText ? `<div style="font-size:12px; font-weight:800; padding-bottom:2px; text-align:center;">${topText}</div>` : '';
+                
+                // 下段：アシスト名。デザイン（仕切り線）と枠の大きさを他と揃えるため、空でも領域を確保する
+                const bottomHtml = `<div style="font-size:11px; font-weight:700; border-top:${topText ? '1px solid ' + border : 'none'}; margin-top:2px; padding-top:2px; text-align:center; color:#111; min-height:1.2em;">${bottomText || ''}</div>`;
 
                 return `<div style="
                            display:flex; flex-direction:column; align-items:center; width:100%; box-sizing:border-box;
@@ -948,6 +968,7 @@ function openMonthlyModal(year, month) {
             };
 
             html += generateGroupedChips(['dr', 'dh', 'da'], true);
+            html += generateGroupedChips(['dt'], false);
             html += generateGroupedChips(['reception'], false);
             html += '</div>';
             td.innerHTML = html;
@@ -997,18 +1018,28 @@ function openRoleMonthlyModal(year, month, role) {
         select.value = currentRMonthlyRole;
     }
     
-    document.getElementById('role-monthly-title').textContent = `${year}年${month}月 職種別月間表`;
+    const roleLabels = { 'dr': 'Dr', 'da': 'DA', 'dh': 'DH', 'tc_dt': 'TC & DT' };
+    const roleLabel = roleLabels[currentRMonthlyRole] || '';
+    document.getElementById('role-monthly-title').textContent = `${year}年${month}月 職種別月間表 (${roleLabel})`;
     
     const container = document.getElementById('role-monthly-table-container');
     container.innerHTML = '';
     
     // 対象の職種のスタッフを取得
+    const targetRoles = currentRMonthlyRole === 'tc_dt' ? ['reception', 'dt'] : [currentRMonthlyRole];
     const staffList = State.staff.filter(s => {
-        if (s.role !== currentRMonthlyRole) return false;
+        if (!targetRoles.includes(s.role)) return false;
         const n = s.name.replace(/\s+/g, '');
-        if (n.includes('院長2') || n.includes('院長２') || n.includes('矯正')) return false;
+        if (n.includes('院長2') || n.includes('院長２') || n.includes('院長3') || n.includes('院長３') || n.includes('Dr2') || n.includes('Dr２') || n.includes('矯正')) return false;
         return true;
-    }).sort((a, b) => (a.order || 0) - (b.order || 0));
+    }).sort((a, b) => {
+        // ロールが異なる場合は、reception を先に、dt を後にする
+        if (a.role !== b.role) {
+            const roleOrder = { reception: 0, dt: 1 };
+            return (roleOrder[a.role] ?? 99) - (roleOrder[b.role] ?? 99);
+        }
+        return (a.order || 0) - (b.order || 0);
+    });
     
     if (staffList.length === 0) {
         container.innerHTML = '<div style="padding:20px; text-align:center; color:#64748b;">この職種のスタッフは登録されていません。</div>';
@@ -1016,212 +1047,230 @@ function openRoleMonthlyModal(year, month, role) {
         return;
     }
 
-    const table = document.createElement('table');
-    table.className = 'monthly-table';
-    table.style.width = '100%';
-    table.style.minWidth = `${100 + staffList.length * 150}px`; // 幅の調整
-    table.style.tableLayout = 'fixed';
-
-    const thead = document.createElement('thead');
-    const headerRow = document.createElement('tr');
-    
-    const thDate = document.createElement('th');
-    thDate.textContent = '日付';
-    thDate.style.width = '100px';
-    thDate.style.textAlign = 'center';
-    thDate.style.fontSize = '14px';
-    thDate.style.background = '#f8fafc';
-    thDate.style.color = '#64748b';
-    thDate.style.position = 'sticky';
-    thDate.style.left = '0';
-    thDate.style.zIndex = '10';
-    headerRow.appendChild(thDate);
-    
-    staffList.forEach(s => {
-        const th = document.createElement('th');
-        th.innerHTML = `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${s.color};margin-right:4px;"></span>${s.name.split(' ').pop()}`;
-        th.style.textAlign = 'center';
-        th.style.fontSize = '14px';
-        th.style.background = '#f8fafc';
-        th.style.color = '#334155';
-        headerRow.appendChild(th);
-    });
-    
-    thead.appendChild(headerRow);
-    table.appendChild(thead);
-    
-    const tbody = document.createElement('tbody');
-    
+    // 最大人数を職種によって調整（Drは9人、その他は7人）
+    const maxStaffPerPage = currentRMonthlyRole === 'dr' ? 9 : 7;
     const daysInMonth = new Date(year, month, 0).getDate();
-    for (let day = 1; day <= daysInMonth; day++) {
-        const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        const dateObj = new Date(year, month - 1, day);
-        const dayIdx = dateObj.getDay();
-        const hName = getHolidayName(dateStr);
-        const targetWk = weekKeyFromDate(getWeekStart(dateObj));
-        const dk = dayKeyFromDate(dateObj);
-        
-        const tr = document.createElement('tr');
-        
-        const tdDate = document.createElement('td');
-        tdDate.style.textAlign = 'center';
-        tdDate.style.padding = '8px';
-        tdDate.style.borderBottom = '1px solid var(--border)';
-        tdDate.style.position = 'sticky';
-        tdDate.style.left = '0';
-        tdDate.style.background = '#fff';
-        tdDate.style.zIndex = '5';
-        
-        let dayColor = 'color: #334155;';
-        if (hName || dayIdx === 0) dayColor = 'color: #ef4444;';
-        else if (dayIdx === 6) dayColor = 'color: #3b82f6;';
 
-        tdDate.innerHTML = `<div style="${dayColor} font-weight:700; font-size:14px;">${day}日<span style="font-size:10px; font-weight:normal; margin-left:4px;">(${DAY_NAMES[dayIdx]})</span></div>`;
-        if (hName) tdDate.innerHTML += `<div style="font-size:10px; color:#ef4444; font-weight:700; margin-top:2px; background:rgba(239,68,68,0.1); padding:2px 4px; border-radius:4px; display:inline-block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:80px;">${hName}</div>`;
-        tr.appendChild(tdDate);
+    for (let chunkIdx = 0; chunkIdx < staffList.length; chunkIdx += maxStaffPerPage) {
+        const chunk = staffList.slice(chunkIdx, chunkIdx + maxStaffPerPage);
         
-        staffList.forEach(staff => {
-            const tdInfo = document.createElement('td');
-            tdInfo.style.padding = '8px';
-            tdInfo.style.borderBottom = '1px solid var(--border)';
-            tdInfo.style.textAlign = 'center';
-            tdInfo.style.verticalAlign = 'middle';
-            if (hName) tdInfo.style.background = 'rgba(255, 235, 238, 0.3)';
-            else if (dayIdx === 0) tdInfo.style.background = 'rgba(255, 235, 238, 0.15)';
-            else if (dayIdx === 6) tdInfo.style.background = 'rgba(235, 245, 255, 0.3)';
-            
-            const leaveVal = getLeaveRecord(targetWk, staff.id, dk);
-            let isAbsence = false;
-            let leaveHtml = '';
-            
-            if (leaveVal && leaveVal !== 'none' && LEAVE_TYPES[leaveVal]) {
-                const isAttendance = leaveVal === 'working-day' || leaveVal === 'comz-vibshutu' || leaveVal === 'other-vibshutu';
-                isAbsence = !isAttendance;
-                
-                const leaveInfo = LEAVE_TYPES[leaveVal];
-                // 「出勤日」と「通常休暇」はバッジを表示しない（元の仕様を維持）
-                if (leaveVal !== 'working-day' && leaveVal !== 'normal-leave') {
-                    const leaveText = leaveInfo.weeklyLabel || leaveInfo.shortLabel || leaveInfo.label;
-                    const leaveColor = leaveInfo.bg.includes('249,115,22') ? '#d97706' : 
-                                       (leaveInfo.bg.includes('139,92,246') ? '#4338ca' : 
-                                       (leaveInfo.bg.includes('6,182,212') ? '#0891b2' : 
-                                       (leaveInfo.bg.includes('59,130,246') ? '#2563eb' : 
-                                       (leaveInfo.bg.includes('16,185,129') ? '#15803d' : '#333'))));
-                    const leaveBg = leaveInfo.bg.replace('0.12', '0.2').replace('0.08', '0.2');
+        const table = document.createElement('table');
+        table.className = 'monthly-table';
+        table.style.width = 'auto'; // 人数に合わせて自動調整
+        table.style.tableLayout = 'fixed';
+        table.style.marginBottom = '40px';
 
-                    leaveHtml = `<div style="display:inline-block; margin-right:2px; padding:2px 4px; border-radius:4px; background:${leaveBg}; color:${leaveColor}; font-weight:700; font-size:11px;">${leaveText}</div>`;
-                }
-            }
-            
-            if (leaveHtml) {
-                tdInfo.innerHTML = leaveHtml;
-            }
-            
-            if (!isAbsence) {
-                let shiftFound = false;
-                let startSlot = 999;
-                let endSlot = -1;
-                let hasMente = false;
-                let hasAssist = false;
-                let assistDrNames = [];
-                let assistDrColors = [];
-                
-                for (let u = 1; u <= TOTAL_UNITS; u++) {
-                    const arr = getUnitShifts(targetWk, dk, u);
-                    arr.forEach(sh => {
-                        let isAssigned = false;
-                        if (staff.role === 'dr' && sh.doctorId === staff.id) isAssigned = true;
-                        
-                        if (staff.role === 'da' && sh.daIds && sh.daIds.includes(staff.id)) {
-                            isAssigned = true;
-                            if (sh.doctorId) {
-                                hasAssist = true;
-                                const dr = State.staff.find(s => s.id === sh.doctorId);
-                                if (dr) {
-                                    const drName = dr.name.split(' ').pop();
-                                    if (!assistDrNames.includes(drName)) {
-                                        assistDrNames.push(drName);
-                                        assistDrColors.push(dr.color);
-                                    }
-                                }
-                            }
-                        }
-                        
-                        if (staff.role === 'dh' && sh.dhIds && sh.dhIds.includes(staff.id)) {
-                            isAssigned = true;
-                            if (!sh.doctorId) {
-                                hasMente = true;
-                            } else {
-                                hasAssist = true;
-                                const dr = State.staff.find(s => s.id === sh.doctorId);
-                                if (dr) {
-                                    const drName = dr.name.split(' ').pop();
-                                    if (!assistDrNames.includes(drName)) {
-                                        assistDrNames.push(drName);
-                                        assistDrColors.push(dr.color);
-                                    }
-                                }
-                            }
-                        }
-                        
-                        if (staff.role === 'reception' && sh.tcIds && sh.tcIds.includes(staff.id)) isAssigned = true;
-                        
-                        if (isAssigned) {
-                            shiftFound = true;
-                            startSlot = Math.min(startSlot, sh.startSlot);
-                            endSlot = Math.max(endSlot, sh.endSlot);
-                        }
-                    });
-                }
-                
-                if (shiftFound) {
-                    let timeText = '';
-                    let baseText = '出勤';
-                    if (staff.role === 'dh' || staff.role === 'da') {
-                        let assistStr = assistDrNames.length > 0 ? assistDrNames.join('/') : 'アシスト';
-                        if (hasMente && hasAssist) baseText = `ﾒﾝﾃ/${assistStr}`;
-                        else if (hasMente) baseText = 'メンテ';
-                        else if (hasAssist) baseText = assistStr;
-                    }
-                    
-                    if (startSlot === 9 && endSlot === 20) {
-                        timeText = baseText;
-                    } else {
-                        let t = '';
-                        if (startSlot === 9) t = `〜${slotToStr(endSlot)}`;
-                        else if (endSlot === 20) t = `${slotToStr(startSlot)}〜`;
-                        else t = `${slotToStr(startSlot)}-${slotToStr(endSlot)}`;
-                        
-                        timeText = (staff.role === 'dh' || staff.role === 'da') ? `${baseText}(${t})` : t;
-                    }
-                    
-                    let bg = colorWithAlpha(staff.color, 0.12);
-                    let border = colorWithAlpha(staff.color, 0.3);
-                    
-                    if ((staff.role === 'dh' || staff.role === 'da') && assistDrColors.length > 0) {
-                        bg = colorWithAlpha(assistDrColors[0], 0.12);
-                        border = colorWithAlpha(assistDrColors[0], 0.3);
-                    }
-                    
-                    tdInfo.innerHTML += `<div style="display:inline-block; padding:4px 8px; border-radius:6px; background:${bg}; border:1px solid ${border}; font-size:14px; font-weight:700; color:#334155;">
-                                           ${timeText}
-                                         </div>`;
-                } else {
-                    if (leaveVal === 'other-vibshutu') {
-                        tdInfo.innerHTML += `<span style="color:#64748b; font-size:12px; margin-left:4px;">(出勤)</span>`;
-                    } else if (!hName && dayIdx !== 0 && dayIdx !== 6 && !leaveHtml) {
-                        tdInfo.innerHTML += `<span style="color:#cbd5e1; font-size:14px;">-</span>`;
-                    }
-                }
-            }
-            tr.appendChild(tdInfo);
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        
+        const thDate = document.createElement('th');
+        thDate.textContent = '日付';
+        thDate.style.width = '100px';
+        thDate.style.textAlign = 'center';
+        thDate.style.fontSize = '14px';
+        thDate.style.background = '#f8fafc';
+        thDate.style.color = '#64748b';
+        thDate.style.position = 'sticky';
+        thDate.style.left = '0';
+        thDate.style.zIndex = '10';
+        headerRow.appendChild(thDate);
+        
+        // スタッフ列
+        chunk.forEach(s => {
+            const th = document.createElement('th');
+            th.innerHTML = `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${s.color};margin-right:4px;"></span>${s.name.split(' ').pop()}`;
+            th.style.width = '100px'; // 列幅を100pxで固定
+            th.style.textAlign = 'center';
+            th.style.fontSize = '14px';
+            th.style.background = '#f8fafc';
+            th.style.color = '#334155';
+            headerRow.appendChild(th);
         });
         
-        tbody.appendChild(tr);
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+        
+        const tbody = document.createElement('tbody');
+        
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const dateObj = new Date(year, month - 1, day);
+            const dayIdx = dateObj.getDay();
+            const hName = getHolidayName(dateStr);
+            const targetWk = weekKeyFromDate(getWeekStart(dateObj));
+            const dk = dayKeyFromDate(dateObj);
+            
+            const tr = document.createElement('tr');
+            
+            const tdDate = document.createElement('td');
+            tdDate.style.textAlign = 'center';
+            tdDate.style.padding = '8px';
+            tdDate.style.borderBottom = '1px solid var(--border)';
+            tdDate.style.position = 'sticky';
+            tdDate.style.left = '0';
+            tdDate.style.background = '#fff';
+            tdDate.style.zIndex = '5';
+            
+            let dayColor = 'color: #334155;';
+            if (hName || dayIdx === 0) dayColor = 'color: #ef4444;';
+            else if (dayIdx === 6) dayColor = 'color: #3b82f6;';
+
+            tdDate.innerHTML = `<div style="${dayColor} font-weight:700; font-size:14px;">${day}日<span style="font-size:10px; font-weight:normal; margin-left:4px;">(${DAY_NAMES[dayIdx]})</span></div>`;
+            if (hName) tdDate.innerHTML += `<div style="font-size:10px; color:#ef4444; font-weight:700; margin-top:2px; background:rgba(239,68,68,0.1); padding:2px 4px; border-radius:4px; display:inline-block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:80px;">${hName}</div>`;
+            tr.appendChild(tdDate);
+            
+            chunk.forEach(staff => {
+                const tdInfo = document.createElement('td');
+                tdInfo.style.padding = '8px';
+                tdInfo.style.borderBottom = '1px solid var(--border)';
+                tdInfo.style.textAlign = 'center';
+                tdInfo.style.verticalAlign = 'middle';
+                if (hName) tdInfo.style.background = 'rgba(255, 235, 238, 0.3)';
+                else if (dayIdx === 0) tdInfo.style.background = 'rgba(255, 235, 238, 0.15)';
+                else if (dayIdx === 6) tdInfo.style.background = 'rgba(235, 245, 255, 0.3)';
+                
+                const leaveVal = getLeaveRecord(targetWk, staff.id, dk);
+                let isAbsence = false;
+                let leaveHtml = '';
+                
+                if (leaveVal && leaveVal !== 'none' && LEAVE_TYPES[leaveVal]) {
+                    const isAttendance = leaveVal === 'working-day' || leaveVal === 'comz-vibshutu' || leaveVal === 'other-vibshutu';
+                    isAbsence = !isAttendance;
+                    
+                    const leaveInfo = LEAVE_TYPES[leaveVal];
+                    if (leaveVal !== 'working-day' && leaveVal !== 'normal-leave') {
+                        const leaveText = leaveInfo.weeklyLabel || leaveInfo.shortLabel || leaveInfo.label;
+                        const leaveColor = leaveInfo.bg.includes('249,115,22') ? '#d97706' : 
+                                           (leaveInfo.bg.includes('139,92,246') ? '#4338ca' : 
+                                           (leaveInfo.bg.includes('6,182,212') ? '#0891b2' : 
+                                           (leaveInfo.bg.includes('59,130,246') ? '#2563eb' : 
+                                           (leaveInfo.bg.includes('16,185,129') ? '#15803d' : '#333'))));
+                        const leaveBg = leaveInfo.bg.replace('0.12', '0.2').replace('0.08', '0.2');
+
+                        leaveHtml = `<div style="display:inline-block; margin-right:2px; padding:2px 4px; border-radius:4px; background:${leaveBg}; color:${leaveColor}; font-weight:700; font-size:11px;">${leaveText}</div>`;
+                    }
+                }
+                
+                if (leaveHtml) {
+                    tdInfo.innerHTML = leaveHtml;
+                }
+                
+                if (!isAbsence) {
+                    let shiftFound = false;
+                    let startSlot = 999;
+                    let endSlot = -1;
+                    let hasMente = false;
+                    let hasAssist = false;
+                    let assistDrNames = [];
+                    let assistDrColors = [];
+                    
+                    for (let u = 1; u <= TOTAL_UNITS; u++) {
+                        const arr = getUnitShifts(targetWk, dk, u);
+                        arr.forEach(sh => {
+                            let isAssigned = false;
+                            if (staff.role === 'dr' && sh.doctorId === staff.id) isAssigned = true;
+                            
+                            if (staff.role === 'da' && sh.daIds && sh.daIds.includes(staff.id)) {
+                                isAssigned = true;
+                                if (sh.doctorId) {
+                                    hasAssist = true;
+                                    const dr = State.staff.find(s => s.id === sh.doctorId);
+                                    if (dr) {
+                                        const drName = dr.name.split(' ').pop();
+                                        if (!assistDrNames.includes(drName)) {
+                                            assistDrNames.push(drName);
+                                            assistDrColors.push(dr.color);
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            if (staff.role === 'dh' && sh.dhIds && sh.dhIds.includes(staff.id)) {
+                                isAssigned = true;
+                                if (!sh.doctorId) {
+                                    hasMente = true;
+                                } else {
+                                    hasAssist = true;
+                                    const dr = State.staff.find(s => s.id === sh.doctorId);
+                                    if (dr) {
+                                        const drName = dr.name.split(' ').pop();
+                                        if (!assistDrNames.includes(drName)) {
+                                            assistDrNames.push(drName);
+                                            assistDrColors.push(dr.color);
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            if (staff.role === 'dt' && sh.dtIds && sh.dtIds.includes(staff.id)) isAssigned = true;
+                            if (staff.role === 'reception' && sh.tcIds && sh.tcIds.includes(staff.id)) isAssigned = true;
+                            
+                            if (isAssigned) {
+                                shiftFound = true;
+                                startSlot = Math.min(startSlot, sh.startSlot);
+                                endSlot = Math.max(endSlot, sh.endSlot);
+                            }
+                        });
+                    }
+                    
+                    if (shiftFound) {
+                        let timeText = '';
+                        let baseText = '出勤';
+                        if (staff.role === 'dh' || staff.role === 'da') {
+                            let assistStr = assistDrNames.length > 0 ? assistDrNames.join('/') : 'アシスト';
+                            if (hasMente && hasAssist) baseText = `ﾒﾝﾃ/${assistStr}`;
+                            else if (hasMente) baseText = 'メンテ';
+                            else if (hasAssist) baseText = assistStr;
+                        }
+                        
+                        if (startSlot === 9 && endSlot === 20) {
+                            timeText = (staff.role === 'dh' || staff.role === 'da') ? baseText : '出勤';
+                        } else {
+                            let t = '';
+                            if (startSlot === 9) t = `〜${slotToStr(endSlot)}`;
+                            else if (endSlot === 20) t = `${slotToStr(startSlot)}〜`;
+                            else t = `${slotToStr(startSlot)}-${slotToStr(endSlot)}`;
+                            
+                            timeText = (staff.role === 'dh' || staff.role === 'da') ? `${baseText}(${t})` : t;
+                        }
+                        
+                        let bg = colorWithAlpha(staff.color, 0.12);
+                        let border = colorWithAlpha(staff.color, 0.3);
+                        
+                        if ((staff.role === 'dh' || staff.role === 'da') && assistDrColors.length > 0) {
+                            bg = colorWithAlpha(assistDrColors[0], 0.12);
+                            border = colorWithAlpha(assistDrColors[0], 0.3);
+                        }
+                        
+                        tdInfo.innerHTML += `<div style="display:inline-block; padding:4px 8px; border-radius:6px; background:${bg}; border:1px solid ${border}; font-size:14px; font-weight:700; color:#334155;">
+                                               ${timeText}
+                                             </div>`;
+                    } else {
+                        if (leaveVal === 'other-vibshutu') {
+                            tdInfo.innerHTML += `<span style="color:#64748b; font-size:12px; margin-left:4px;">(出勤)</span>`;
+                        } else if (!hName && dayIdx !== 0 && dayIdx !== 6 && !leaveHtml) {
+                            tdInfo.innerHTML += `<span style="color:#cbd5e1; font-size:14px;">-</span>`;
+                        }
+                    }
+                }
+                tr.appendChild(tdInfo);
+            });
+            
+            tbody.appendChild(tr);
+        }
+        
+        table.appendChild(tbody);
+        container.appendChild(table);
+
+        // 改ページ用のスペーサー（2つ目以降のグループの前に挿入）
+        if (chunkIdx + maxStaffPerPage < staffList.length) {
+            const spacer = document.createElement('div');
+            spacer.style.height = '1px';
+            spacer.style.pageBreakBefore = 'always';
+            spacer.style.clear = 'both';
+            container.appendChild(spacer);
+        }
     }
-    
-    table.appendChild(tbody);
-    container.appendChild(table);
     
     openModal('modal-role-monthly');
 }
@@ -1245,3 +1294,4 @@ document.addEventListener('DOMContentLoaded', () => {
         openRoleMonthlyModal(currentRMonthlyYear, currentRMonthlyMonth, e.target.value);
     });
 });
+

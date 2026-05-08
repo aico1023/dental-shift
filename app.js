@@ -442,7 +442,7 @@ document.addEventListener('keydown', e => {
 });
 
 // ------ モーダル印刷 (別ウィンドウ方式) ------
-window.printModal = function (containerId = 'monthly-table-container', titleId = 'monthly-title') {
+window.printModal = function (containerId = 'monthly-table-container', titleId = 'monthly-title', orientation = 'landscape') {
     const container = document.getElementById(containerId);
     const title = document.getElementById(titleId)?.textContent || '月間シフト表';
     if (!container) return;
@@ -470,25 +470,32 @@ window.printModal = function (containerId = 'monthly-table-container', titleId =
             <style>
                 ${styles}
                 @media print {
-                    @page { size: landscape; margin: 0; }
+                    @page { size: ${orientation}; margin: 10mm; }
                     body { 
-                        padding: 15mm; 
+                        padding: 0; 
                         margin: 0; 
                         background: white; 
                         -webkit-print-color-adjust: exact; 
-                        print-color-adjust: exact; 
+                        print-color-adjust: exact;
+                        overflow: visible !important;
                     }
                     .print-only-header { display: block !important; text-align: center; margin-bottom: 20px; }
-                    table { width: 100% !important; border-collapse: collapse; page-break-inside: auto; }
+                    table { width: 100% !important; border-collapse: collapse; page-break-inside: auto; table-layout: fixed !important; }
                     tr { page-break-inside: avoid; page-break-after: auto; }
                     thead { display: table-header-group; }
-                    th, td { border: 1px solid #ccc !important; }
+                    th, td { 
+                        border: 1px solid #ccc !important; 
+                        position: static !important; /* stickyを解除 */
+                        background: white !important;
+                        color: black !important;
+                    }
                     /* 不要な要素を非表示 */
-                    .btn, button, .modal-close { display: none !important; }
+                    .btn, button, .modal-close, .modal-header { display: none !important; }
+                    .modal-body { overflow: visible !important; padding: 0 !important; }
                 }
                 body { font-family: sans-serif; padding: 20px; }
-                .print-only-header { text-align: center; margin-bottom: 20px; }
-                .print-only-header h1 { font-size: 20px; margin: 0; }
+                .print-only-header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+                .print-only-header h1 { font-size: 24px; margin: 0; color: #000; }
                 table { border-collapse: collapse; width: 100%; font-size: 11px; }
                 th, td { border: 1px solid #ccc; padding: 3px; text-align: left; }
                 th { background: #f5f5f5; }
