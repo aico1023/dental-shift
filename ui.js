@@ -1,4 +1,4 @@
-// ============================================================
+﻿// ============================================================
 // ui.js - モーダル・スタッフパネル・トースト・集計・その他UI
 // ============================================================
 
@@ -180,6 +180,21 @@ function renderStaffPanel() {
         const isAttendance = leaveType === 'working-day' || leaveType === 'comz-vibshutu' || leaveType === 'other-vibshutu';
         const isAbsent = leaveInfo && !isAttendance;
         return isAbsent;
+    });
+
+    // 休みの種類 > 職種 > スタッフ順 で並び替え
+    const leavePriority = { 'paid': 1, 'happy': 2, 'other-vibkyuu': 3, 'normal-leave': 4, 'shift-off': 5 };
+    const rolePriority = { 'dr': 1, 'dh': 2, 'da': 3, 'dt': 4, 'reception': 5 };
+    absentMembers.sort((a, b) => {
+        const leaveA = getLeaveRecord(wk, a.id, dk);
+        const leaveB = getLeaveRecord(wk, b.id, dk);
+        const pA = leavePriority[leaveA] || 99;
+        const pB = leavePriority[leaveB] || 99;
+        if (pA !== pB) return pA - pB;
+        const rA = rolePriority[a.role] || 99;
+        const rB = rolePriority[b.role] || 99;
+        if (rA !== rB) return rA - rB;
+        return (a.order || 0) - (b.order || 0);
     });
 
     if (absentMembers.length > 0) {
