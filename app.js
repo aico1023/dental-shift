@@ -592,12 +592,8 @@ function setupBulkShiftEvents() {
     });
 
     // 開始日・終了日の手動変更イベント
-    startInput?.addEventListener('change', () => {
-        handleBulkPeriodChange();
-    });
-    endInput?.addEventListener('change', () => {
-        handleBulkPeriodChange();
-    });
+    // ※ Flatpickr の onChange で既に handleBulkPeriodChange を呼んでいるため
+    //   ここでは二重実行を避けるために登録しない
 
     // 曜日チェックボックスのリアルタイム自動保存（Event Delegation）
     document.getElementById('bulk-shift-tbody')?.addEventListener('change', (e) => {
@@ -696,7 +692,11 @@ function updateBulkPeriodFromMonth(isInit = false) {
         endInput.dataset.prevVal = newEndStr;
         renderBulkShiftTable();
     } else {
-        handleBulkPeriodChange();
+        // 月プルダウン切り替え時はアジャスト処理を走らせず
+        // prevValを更新してテーブルを再描画するだけにする
+        startInput.dataset.prevVal = newStartStr;
+        endInput.dataset.prevVal = newEndStr;
+        renderBulkShiftTable();
     }
 }
 
