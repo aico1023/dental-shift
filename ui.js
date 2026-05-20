@@ -1,11 +1,12 @@
-﻿// ============================================================
+// ============================================================
 // ui.js - モーダル・スタッフパネル・トースト・集計・その他UI
 // ============================================================
 
 // 休暇種別定義
 const LEAVE_TYPES = {
     'working-day': { label: '📅 出勤日', shortLabel: '📅 出勤日', weeklyLabel: '📅出勤', cls: 'leave-working', bg: 'rgba(16,185,129,0.08)' },
-    'normal-leave': { label: '通常休暇', shortLabel: '通常休暇', weeklyLabel: '休', cls: 'leave-normal', bg: 'rgba(59,130,246,0.12)' },
+    'shift-off': { label: 'シフト休み', shortLabel: '', weeklyLabel: ' ', cls: 'leave-shiftoff', bg: 'rgba(156, 163, 175, 0.2)' },
+    'normal-leave': { label: '通常休暇', shortLabel: '通常休暇', weeklyLabel: '休', cls: 'leave-normal', bg: 'rgba(59, 130, 246, 0.12)' },
     'paid': { label: '🏖️ 有給休暇', shortLabel: '🏖️ 有給', weeklyLabel: '🏖️有休', cls: 'leave-paid', bg: 'rgba(249,115,22,0.12)' },
     'happy': { label: '🎌 ハッピーマンデー', shortLabel: '🎌 HM', weeklyLabel: '🎌HM', cls: 'leave-happy', bg: 'rgba(139,92,246,0.12)' },
     'other-vibkyuu': { label: '😴 その他休暇', shortLabel: '😴 その他休暇', weeklyLabel: '😴休暇', cls: 'leave-vibkyuu', bg: 'rgba(6,182,212,0.12)' },
@@ -48,6 +49,85 @@ function setupModalClose(id) {
     });
 }
 
+// ------ スタッフカードの生成ヘルパー（並び替えドラッグ＆ドロップ含む） ------
+function createStaffCardHelper(s, isAbsent, validation, wk, dk) {
+    const card = document.createElement('div');
+    card.className = 'staff-card';
+    card.id = `staff-card-${s.id}`;
+
+    if (validation.missingAttendance.has(s.id)) {
+        card.classList.add('has-error');
+        card.title = '出勤日ですがシフトが未入力です';
+    }
+
+    // 当日の休暇状態を取得
+    const leaveType = getLeaveRecord(wk, s.id, dk);
+    const leaveInfo = leaveType ? LEAVE_TYPES[leaveType] : null;
+    const leaveBadgeHtml = leaveInfo
+        ? `<span class="staff-leave-badge ${leaveInfo.cls}">${leaveInfo.shortLabel || leaveInfo.label}</span>`
+        : '';
+
+    card.innerHTML = `
+        <div class="staff-avatar" style="background:${isAbsent ? 'var(--border)' : s.color}">${isAbsent ? '—' : s.name.slice(0, 1)}</div>
+        <div class="staff-info">
+          <div class="staff-name">${s.name}</div>
+          <div class="staff-meta">${s.team ? s.team + 'チーム・' : ''}${s.employment === 'fulltime' ? '常勤' : '非常勤'}</div>
+        </div>
+        ${leaveBadgeHtml || `<span class="staff-badge ${ROLES[s.role]?.badge || ''}">${ROLES[s.role]?.label || s.role}</span>`}
+    `;
+    card.title = leaveInfo ? `${s.name}（${leaveInfo.label}）` : s.name;
+
+    if (isAbsent) {
+        card.style.opacity = '0.65';
+        card.style.cursor = 'default';
+    } else {
+        card.style.opacity = '';
+        card.style.cursor = '';
+        card.addEventListener('dblclick', () => openStaffEditModal(s.id));
+        attachStaffDrag(card, s.id);
+
+        // --- スタッフの並び替え用ドラッグ＆ドロップ設定 ---
+        card.addEventListener('dragenter', e => {
+            e.preventDefault();
+            if (e.dataTransfer.types.includes('text/plain')) { 
+                card.style.borderTop = '2px solid var(--accent)'; 
+            }
+        });
+        card.addEventListener('dragover', e => {
+            e.preventDefault(); 
+            e.dataTransfer.dropEffect = 'move';
+        });
+        card.addEventListener('dragleave', e => {
+            card.style.borderTop = '';
+        });
+        card.addEventListener('drop', e => {
+            e.preventDefault();
+            e.stopPropagation(); 
+            card.style.borderTop = '';
+
+            const draggedStaffId = e.dataTransfer.getData('staffId');
+            if (!draggedStaffId || draggedStaffId === String(s.id)) return;
+
+            const draggedStaff = State.staff.find(st => String(st.id) === draggedStaffId);
+            if (!draggedStaff || draggedStaff.role !== s.role) {
+                showToast('warning', '並び替えエラー', '異なる職種のスタッフとは入れ替えられません。', 2000);
+                return;
+            }
+
+            const fromIndex = State.staff.findIndex(st => String(st.id) === draggedStaffId);
+            const toIndex = State.staff.findIndex(st => String(st.id) === String(s.id));
+
+            if (fromIndex >= 0 && toIndex >= 0) {
+                const [movedStaff] = State.staff.splice(fromIndex, 1);
+                State.staff.splice(toIndex, 0, movedStaff);
+                saveAll();
+                renderStaffPanel(); 
+            }
+        });
+    }
+    return card;
+}
+
 // ------ スタッフパネル描画 ------
 function renderStaffPanel() {
     const body = document.getElementById('staff-panel-body');
@@ -61,9 +141,21 @@ function renderStaffPanel() {
 
     const validation = runValidation(wk, dk);
 
+    // 上部：本日出勤するスタッフのみを職種別に描画
     roleOrder.forEach(role => {
         const members = State.staff.filter(s => s.role === role);
         if (members.length === 0) return;
+
+        // 出勤者（休暇ではないメンバー）のみを抽出
+        const activeMembers = members.filter(s => {
+            const leaveType = getLeaveRecord(wk, s.id, dk);
+            const leaveInfo = leaveType ? LEAVE_TYPES[leaveType] : null;
+            const isAttendance = leaveType === 'working-day' || leaveType === 'comz-vibshutu' || leaveType === 'other-vibshutu';
+            const isAbsent = leaveInfo && !isAttendance;
+            return !isAbsent;
+        });
+
+        if (activeMembers.length === 0) return;
 
         const section = document.createElement('div');
         section.className = 'role-section';
@@ -73,88 +165,211 @@ function renderStaffPanel() {
         label.textContent = roleLabels[role];
         section.appendChild(label);
 
-        members.forEach(s => {
-            const card = document.createElement('div');
-            card.className = 'staff-card';
-            card.id = `staff-card-${s.id}`;
-
-            if (validation.missingAttendance.has(s.id)) {
-                card.classList.add('has-error');
-                card.title = '振出設定ですがシフトが未入力です';
-            }
-
-            // 当日の休暇状態を取得
-            const leaveType = getLeaveRecord(wk, s.id, dk);
-            const leaveInfo = leaveType ? LEAVE_TYPES[leaveType] : null;
-            // 出勤日・振出系は出勤扱い（アイコンのみ付与・ドラッグ有効）
-            const isAttendance = leaveType === 'working-day' || leaveType === 'comz-vibshutu' || leaveType === 'other-vibshutu';
-            const isAbsent = leaveInfo && !isAttendance;
-
-            const leaveBadgeHtml = leaveInfo
-                ? `<span class="staff-leave-badge ${leaveInfo.cls}">${leaveInfo.shortLabel || leaveInfo.label}</span>`
-                : '';
-
-            card.innerHTML = `
-        <div class="staff-avatar" style="background:${isAbsent ? 'var(--border)' : s.color}">${isAbsent ? '—' : s.name.slice(0, 1)}</div>
-        <div class="staff-info">
-          <div class="staff-name">${s.name}</div>
-          <div class="staff-meta">${s.team ? s.team + 'チーム・' : ''}${s.employment === 'fulltime' ? '常勤' : '非常勤'}</div>
-        </div>
-        ${leaveBadgeHtml || `<span class="staff-badge ${ROLES[s.role]?.badge || ''}">${ROLES[s.role]?.label || s.role}</span>`}
-      `;
-            card.title = leaveInfo ? `${s.name}（${leaveInfo.label}）` : s.name;
-            if (isAbsent) {
-                card.style.opacity = '0.65';
-                card.style.cursor = 'default';
-            } else {
-                card.style.opacity = '';
-                card.style.cursor = '';
-                card.addEventListener('dblclick', () => openStaffEditModal(s.id));
-                attachStaffDrag(card, s.id);
-
-                // --- ここからスタッフの並び替え用ドラッグ＆ドロップ設定 ---
-                card.addEventListener('dragenter', e => {
-                    e.preventDefault();
-                    if (e.dataTransfer.types.includes('text/plain')) { 
-                        card.style.borderTop = '2px solid var(--accent)'; 
-                    }
-                });
-                card.addEventListener('dragover', e => {
-                    e.preventDefault(); 
-                    e.dataTransfer.dropEffect = 'move';
-                });
-                card.addEventListener('dragleave', e => {
-                    card.style.borderTop = '';
-                });
-                card.addEventListener('drop', e => {
-                    e.preventDefault();
-                    e.stopPropagation(); 
-                    card.style.borderTop = '';
-
-                    const draggedStaffId = e.dataTransfer.getData('staffId');
-                    if (!draggedStaffId || draggedStaffId === String(s.id)) return;
-
-                    const draggedStaff = State.staff.find(st => String(st.id) === draggedStaffId);
-                    if (!draggedStaff || draggedStaff.role !== s.role) {
-                        showToast('warning', '並び替えエラー', '異なる職種のスタッフとは入れ替えられません。', 2000);
-                        return;
-                    }
-
-                    const fromIndex = State.staff.findIndex(st => String(st.id) === draggedStaffId);
-                    const toIndex = State.staff.findIndex(st => String(st.id) === String(s.id));
-
-                    if (fromIndex >= 0 && toIndex >= 0) {
-                        const [movedStaff] = State.staff.splice(fromIndex, 1);
-                        State.staff.splice(toIndex, 0, movedStaff);
-                        saveAll();
-                        renderStaffPanel(); 
-                    }
-                });
-            }
+        activeMembers.forEach(s => {
+            const card = createStaffCardHelper(s, false, validation, wk, dk);
             section.appendChild(card);
         });
 
         body.appendChild(section);
+    });
+
+    // 下部：本日お休みのスタッフ全員を「😴 本日のお休み」としてまとめて描画
+    const absentMembers = State.staff.filter(s => {
+        const leaveType = getLeaveRecord(wk, s.id, dk);
+        const leaveInfo = leaveType ? LEAVE_TYPES[leaveType] : null;
+        const isAttendance = leaveType === 'working-day' || leaveType === 'comz-vibshutu' || leaveType === 'other-vibshutu';
+        const isAbsent = leaveInfo && !isAttendance;
+        return isAbsent;
+    });
+
+    if (absentMembers.length > 0) {
+        const section = document.createElement('div');
+        section.className = 'role-section absent-section';
+        section.style.marginTop = '20px';
+        section.style.borderTop = '1px dashed var(--border)';
+        section.style.paddingTop = '15px';
+
+        const label = document.createElement('div');
+        label.className = 'role-label';
+        label.style.color = 'var(--text-muted)';
+        label.textContent = '😴 本日のお休み (職種共通)';
+        section.appendChild(label);
+
+        absentMembers.forEach(s => {
+            const card = createStaffCardHelper(s, true, validation, wk, dk);
+            section.appendChild(card);
+        });
+
+        body.appendChild(section);
+    }
+}
+
+// ------ シフト管理モーダル ------
+let currentBulkShiftRole = 'dr';
+
+function renderBulkShiftTabs() {
+    const tabsEl = document.getElementById('bulk-shift-role-tabs');
+    if (!tabsEl) return;
+    tabsEl.innerHTML = '';
+    const roleLabels = { dr: 'Dr', dh: 'DH', da: 'DA', tc_dt: 'TC & DT' };
+    ['dr', 'dh', 'da', 'tc_dt'].forEach(r => {
+        const btn = document.createElement('button');
+        btn.className = currentBulkShiftRole === r ? 'btn btn-primary btn-sm' : 'btn btn-ghost btn-sm';
+        btn.textContent = roleLabels[r];
+        btn.style.padding = '4px 16px';
+        btn.addEventListener('click', () => {
+            currentBulkShiftRole = r;
+            renderBulkShiftTabs();
+            renderBulkShiftTable();
+        });
+        tabsEl.appendChild(btn);
+    });
+}
+
+function openBulkShiftModal() {
+    const select = document.getElementById('bulk-month-select');
+    const startInput = document.getElementById('bulk-start-date');
+    const endInput = document.getElementById('bulk-end-date');
+
+    if (select) {
+        select.innerHTML = '';
+        const today = new Date();
+        const startYear = today.getFullYear();
+        const startMonth = today.getMonth(); // 0-indexed
+
+        for (let i = 0; i < 24; i++) {
+            const date = new Date(startYear, startMonth + i, 1);
+            const val = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            const text = `${date.getFullYear()}年${date.getMonth() + 1}月`;
+            const opt = document.createElement('option');
+            opt.value = val;
+            opt.textContent = text;
+            select.appendChild(opt);
+        }
+
+        // 現在メイン画面で表示している週の月をデフォルトの対象月とする
+        const baseDate = State.currentWeekStart || today;
+        const defaultYM = `${baseDate.getFullYear()}-${String(baseDate.getMonth() + 1).padStart(2, '0')}`;
+
+        // セレクトボックスの選択を合わせる
+        if (Array.from(select.options).some(opt => opt.value === defaultYM)) {
+            select.value = defaultYM;
+        } else {
+            select.value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+        }
+
+        const activeYM = select.value;
+
+        // その月専用の個別期間があれば最優先でロードする
+        const monthlyPeriodJson = localStorage.getItem(`dsa_bulk_period_${activeYM}`);
+        let activeStart = '';
+        let activeEnd = '';
+
+        if (monthlyPeriodJson) {
+            try {
+                const period = JSON.parse(monthlyPeriodJson);
+                if (period && period.start && period.end) {
+                    activeStart = period.start;
+                    activeEnd = period.end;
+                }
+            } catch (e) {
+                console.error("Failed to parse monthly period", e);
+            }
+        }
+
+        // 個別期間が無い場合は、自動的にその月の月初〜月末を計算してデフォルト期間とする
+        if (!activeStart || !activeEnd) {
+            const [year, month] = activeYM.split('-').map(Number);
+            const startD = new Date(year, month - 1, 1);
+            const endD = new Date(year, month, 0);
+            activeStart = _localDateStr(startD);
+            activeEnd = _localDateStr(endD);
+        }
+
+        if (startInput && endInput) {
+            startInput.value = activeStart;
+            endInput.value = activeEnd;
+            startInput.dataset.prevVal = activeStart;
+            endInput.dataset.prevVal = activeEnd;
+
+            // 全体の最新期間としても保存
+            localStorage.setItem('dsa_bulk_start_date', activeStart);
+            localStorage.setItem('dsa_bulk_end_date', activeEnd);
+
+            // Flatpickr の表示値も同期
+            setTimeout(() => {
+                startInput._flatpickr?.setDate(activeStart, false);
+                endInput._flatpickr?.setDate(activeEnd, false);
+            }, 0);
+        }
+    }
+
+    // テーブル描画
+    renderBulkShiftTabs();
+    renderBulkShiftTable();
+
+    openModal('modal-bulk-shift');
+}
+
+function renderBulkShiftTable() {
+    const tbody = document.getElementById('bulk-shift-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const startDateStr = document.getElementById('bulk-start-date')?.value;
+    const endDateStr = document.getElementById('bulk-end-date')?.value;
+
+    if (!startDateStr || !endDateStr) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px; color:var(--text-muted);">日付範囲を指定してください。</td></tr>';
+        return;
+    }
+
+    // Dr, DH, DA, DT, TC の順番でスタッフをソートして表示（院長2, 3やDr2, 矯正などもすべて一括設定対象にする）
+    const roleOrder = ['dr', 'dh', 'da', 'dt', 'reception'];
+    let filteredStaff = [...State.staff].sort((a, b) => {
+        if (a.role !== b.role) {
+            return roleOrder.indexOf(a.role) - roleOrder.indexOf(b.role);
+        }
+        return (a.order || 0) - (b.order || 0);
+    });
+
+    if (currentBulkShiftRole === 'tc_dt') {
+        filteredStaff = filteredStaff.filter(s => s.role === 'dt' || s.role === 'reception');
+    } else {
+        filteredStaff = filteredStaff.filter(s => s.role === currentBulkShiftRole);
+    }
+
+    filteredStaff.forEach(s => {
+        // 各スタッフについて、期間内のチェックボックス初期状態を取得
+        const dayStates = getBulkDayCheckboxesState(s.id, startDateStr, endDateStr); // 0=日, 1=月... の配列
+        const displayDays = [1, 2, 3, 4, 5, 6, 0]; // 月〜日の順
+
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid var(--border)';
+        
+        let tdsHtml = `
+            <td style="padding: 10px 12px; display: flex; align-items: center; gap: 8px;">
+                <span class="staff-color-dot" style="background:${s.color}"></span>
+                <span style="font-weight:600;">${s.name}</span>
+                <span class="staff-badge ${ROLES[s.role]?.badge || ''}" style="margin-left:auto;">${ROLES[s.role]?.label || s.role}</span>
+            </td>
+        `;
+
+        displayDays.forEach(dayOfWeek => {
+            const isChecked = dayStates[dayOfWeek];
+            tdsHtml += `
+                <td style="padding: 10px 6px; text-align: center; vertical-align: middle;">
+                    <input type="checkbox" class="bulk-day-checkbox" 
+                           data-staff-id="${s.id}" 
+                           data-day-of-week="${dayOfWeek}" 
+                           ${isChecked ? 'checked' : ''} 
+                           style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
+                </td>
+            `;
+        });
+
+        tr.innerHTML = tdsHtml;
+        tbody.appendChild(tr);
     });
 }
 
@@ -535,9 +750,8 @@ function renderWeeklySummary() {
     if (!container) return;
     container.innerHTML = '';
 
-    // 週間表のみ「月曜始まり」にする (日曜始まりの currentWeekStart に +1日)
+    // 週間集計表を月曜始まりで表示 (State.currentWeekStart はすでに月曜始まり)
     const mon = new Date(State.currentWeekStart);
-    mon.setDate(mon.getDate() + 1); 
     const days = getDayDates(mon); 
     const dayKeys = days.map(d => dayKeyFromDate(d));
 
@@ -613,16 +827,20 @@ function renderWeeklySummary() {
 
                     const leaveType = getLeaveRecord(targetWk, staff.id, dk);
                     td.style.textAlign = 'center';
-                    if (leaveType) {
+                    if (leaveType === 'normal-leave' || leaveType === 'shift-off') {
+                        // 通常休暇やシフト休みの場合はなにも表示しない（空欄）
+                        td.innerHTML = '';
+                    } else if (leaveType && leaveType !== 'working-day') {
+                        // 有給休暇や特別休暇の場合
                         const l = LEAVE_TYPES[leaveType] || { label: '休暇', bg: 'var(--bg)' };
                         td.style.background = l.bg;
                         td.innerHTML = `<span class="leave-badge ${l.cls}">${l.weeklyLabel || l.shortLabel || l.label}</span>`;
-                    } else if (isWorking) {
+                    } else if (isWorking || leaveType === 'working-day') {
                         td.style.background = colorWithAlpha(staff.color, 0.15);
                         td.innerHTML = `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${staff.color};margin:auto"></span>`;
                     } else {
-                        td.style.color = '#ccc';
-                        td.textContent = '—';
+                        // 未設定のお休みの日（—）もなにも表示しない（空欄）
+                        td.innerHTML = '';
                     }
                 }
                 tr.appendChild(td);
@@ -737,22 +955,47 @@ function openLeaveModal(year, month, role) {
             if (dayIdx === 0 || hName) td.style.background = 'rgba(254,226,226,0.15)';
             else if (dayIdx === 6) td.style.background = 'rgba(219,234,254,0.15)';
 
+            // シフトが入っている（出勤）か判定
+            let isWorking = false;
+            for (let u = 1; u <= TOTAL_UNITS; u++) {
+                const arr = getUnitShifts(wk, dk, u);
+                for (const sh of arr) {
+                    if ([sh.doctorId, ...(sh.dhIds || []), ...(sh.daIds || []), ...(sh.dtIds || []), ...(sh.tcIds || [])].includes(staff.id)) {
+                        isWorking = true;
+                        break;
+                    }
+                }
+                if (isWorking) break;
+            }
+
+            const placeholderText = isWorking ? '—' : '';
+
             const sel = document.createElement('select');
             sel.className = 'leave-select';
             sel.style.cssText = 'width:100%; border:none; background:transparent; font-size:10px; padding:6px 2px; outline:none; cursor:pointer; text-align-last:center;';
-            sel.innerHTML = `<option value="">&#x2014;</option>` + Object.keys(LEAVE_TYPES).map(t => `<option value="${t}">${LEAVE_TYPES[t].shortLabel || LEAVE_TYPES[t].label}</option>`).join('');
+            sel.innerHTML = `<option value="">${placeholderText}</option>` + Object.keys(LEAVE_TYPES).map(t => `<option value="${t}" style="color: var(--text-primary);">${LEAVE_TYPES[t].shortLabel || LEAVE_TYPES[t].label}</option>`).join('');
             
+            const updateSelectColor = () => {
+                if (sel.value === 'shift-off') {
+                    sel.style.color = 'transparent';
+                } else {
+                    sel.style.color = '';
+                }
+            };
+
             const current = getLeaveRecord(wk, staff.id, dk);
             if (current) {
                 sel.value = current;
                 const l = LEAVE_TYPES[current];
                 if (l) td.style.background = l.bg;
             }
+            updateSelectColor();
 
             sel.addEventListener('change', () => {
                 setLeaveRecord(wk, staff.id, dk, sel.value);
                 saveAll();
                 renderStaffPanel();
+                updateSelectColor();
                 if (sel.value && LEAVE_TYPES[sel.value]) {
                     td.style.background = LEAVE_TYPES[sel.value].bg;
                 } else {
@@ -1138,7 +1381,7 @@ function openRoleMonthlyModal(year, month, role) {
                     isAbsence = !isAttendance;
                     
                     const leaveInfo = LEAVE_TYPES[leaveVal];
-                    if (leaveVal !== 'working-day' && leaveVal !== 'normal-leave') {
+                    if (leaveVal !== 'working-day' && leaveVal !== 'normal-leave' && leaveVal !== 'shift-off') {
                         const leaveText = leaveInfo.weeklyLabel || leaveInfo.shortLabel || leaveInfo.label;
                         const leaveColor = leaveInfo.bg.includes('249,115,22') ? '#d97706' : 
                                            (leaveInfo.bg.includes('139,92,246') ? '#4338ca' : 
@@ -1294,4 +1537,6 @@ document.addEventListener('DOMContentLoaded', () => {
         openRoleMonthlyModal(currentRMonthlyYear, currentRMonthlyMonth, e.target.value);
     });
 });
+
+
 

@@ -278,6 +278,17 @@ ol {
   white-space: nowrap;
 }
 
+.tab-error {
+  font-size: 9px;
+  color: #ef4444;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.day-tab.has-error {
+  border-bottom: 2px solid #ef4444;
+}
+
 .day-tab.saturday { color: #2563eb; }
 .day-tab.sunday { color: #ef4444; }
 
@@ -2269,4 +2280,177 @@ ol {
     border: 1px solid #333 !important;
     color: #000 !important;
   }
+}
+
+/* ============================================================
+   Bulk Shift Table (一括登録用テーブル)
+   ============================================================ */
+.bulk-shift-table th {
+  background-color: #f1f5f9;
+  font-weight: 700;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+.bulk-shift-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.bulk-shift-table tr:hover {
+  background-color: #f8fafc;
+}
+.bulk-shift-table input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--primary);
+  display: block;
+  margin: 0 auto;
+}
+.bulk-shift-table select {
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  width: 100%;
+}
+.bulk-shift-staff-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+/* ========== FLATPICKR MODERN CUSTOM THEME ========== */
+/* カレンダー全体コンテナ */
+.flatpickr-calendar {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  box-shadow: var(--shadow-lg) !important;
+  font-family: inherit !important;
+  padding: 6px 0 !important; /* 左右の見切れ（日曜日が切れる問題）を防ぐため、左右 padding は 0 にします */
+  box-sizing: border-box !important;
+}
+
+/* カレンダー上部の不要な吹き出し矢印を非表示にしてスッキリさせる */
+.flatpickr-calendar.arrowTop:before,
+.flatpickr-calendar.arrowTop:after,
+.flatpickr-calendar.arrowBottom:before,
+.flatpickr-calendar.arrowBottom:after {
+  border: none !important;
+  display: none !important;
+}
+
+/* 月・年のヘッダー */
+.flatpickr-months {
+  margin-bottom: 8px;
+}
+.flatpickr-current-month {
+  font-weight: 700 !important;
+  font-size: 14px !important;
+  color: var(--text) !important;
+}
+.flatpickr-current-month .numInputWrapper span.arrowUp,
+.flatpickr-current-month .numInputWrapper span.arrowDown {
+  display: none !important; /* 年の上下矢印を非表示 */
+}
+
+/* 左右月移動矢印ボタン */
+.flatpickr-prev-month,
+.flatpickr-next-month {
+  padding: 6px !important;
+  border-radius: 6px !important;
+  transition: all 0.2s !important;
+}
+.flatpickr-prev-month:hover,
+.flatpickr-next-month:hover {
+  background: var(--surface-hover) !important;
+}
+.flatpickr-prev-month svg,
+.flatpickr-next-month svg {
+  fill: var(--text-muted) !important;
+}
+.flatpickr-prev-month:hover svg,
+.flatpickr-next-month:hover svg {
+  fill: var(--text) !important;
+}
+
+/* 曜日ヘッダー */
+.flatpickr-weekdays {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: var(--text-muted) !important;
+  margin-bottom: 8px !important;
+}
+
+/* 日付セル全体 */
+.flatpickr-day {
+  border-radius: 6px !important;
+  border: 1px solid transparent !important;
+  font-size: 12px !important;
+  height: 34px !important;
+  line-height: 32px !important;
+  transition: all 0.15s ease !important;
+  color: var(--text) !important;
+}
+
+/* 日付セルホバー時 */
+.flatpickr-day:hover,
+.flatpickr-day:focus {
+  background: var(--surface-hover) !important;
+  border-color: transparent !important;
+  transform: translateY(-1px);
+}
+
+/* 前月・翌月の日付 */
+.flatpickr-day.prevMonthDay,
+.flatpickr-day.nextMonthDay {
+  color: var(--text-muted) !important;
+  opacity: 0.35 !important;
+}
+
+/* 今日 */
+.flatpickr-day.today {
+  border-color: #f59e0b !important;
+  color: #f59e0b !important;
+  font-weight: 800 !important;
+}
+.flatpickr-day.today:hover {
+  background: var(--surface-hover) !important;
+  color: #f59e0b !important;
+}
+
+/* 選択された日付 */
+.flatpickr-day.selected,
+.flatpickr-day.selected:focus,
+.flatpickr-day.selected:hover {
+  background: #7c3aed !important;
+  border-color: #7c3aed !important;
+  color: white !important;
+  font-weight: 700 !important;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3) !important;
+  transform: none !important;
+}
+
+/* 土日色付け (月曜始まり: 6番目土曜、7番目日曜) */
+.flatpickr-calendar .flatpickr-weekday:nth-child(6) {
+  color: #2563eb !important; /* 青 */
+}
+.flatpickr-calendar .flatpickr-weekday:nth-child(7) {
+  color: #dc2626 !important; /* 赤 */
+}
+.flatpickr-calendar .flatpickr-day:nth-child(7n-1):not(.prevMonthDay):not(.nextMonthDay):not(.flatpickr-disabled) {
+  color: #2563eb !important; /* 土曜日：青 */
+}
+.flatpickr-calendar .flatpickr-day:nth-child(7n):not(.prevMonthDay):not(.nextMonthDay):not(.flatpickr-disabled) {
+  color: #dc2626 !important; /* 日曜日：赤 */
+}
+
+/* 土日が選択された、または今日のとき、背景色の上に文字色が被って見づらくならないように調整 */
+.flatpickr-calendar .flatpickr-day.selected:nth-child(7n-1),
+.flatpickr-calendar .flatpickr-day.selected:nth-child(7n),
+.flatpickr-calendar .flatpickr-day.today:nth-child(7n-1),
+.flatpickr-calendar .flatpickr-day.today:nth-child(7n) {
+  color: #ffffff !important;
 }

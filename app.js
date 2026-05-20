@@ -162,6 +162,7 @@ function initApp() {
         buildTimeline(currentWeekKey(), currentDayKey());
         setupContextMenu();
         setupStaffModal();
+        setupBulkShiftEvents();
     });
 }
 
@@ -176,6 +177,7 @@ function renderDayTabs() {
     container.innerHTML = '';
     const days = getDayDates(State.currentWeekStart);
     const today = new Date(); today.setHours(0, 0, 0, 0);
+    const wk = currentWeekKey();
 
     days.forEach((d, i) => {
         const tab = document.createElement('div');
@@ -189,7 +191,22 @@ function renderDayTabs() {
         const holidayName = getHolidayName(dk);
         if (holidayName) tab.classList.add('holiday');
 
-        tab.innerHTML = `<span class="tab-day">${DAY_NAMES[dayIdx]}</span><span class="tab-date">${formatDate(d)}</span>${holidayName ? `<span class="tab-holiday">${holidayName}</span>` : ''}`;
+        let errorIndicator = '';
+        if (typeof runValidation === 'function') {
+            const v = runValidation(wk, dk);
+            // 人員不足などの黄色い警告は除外し、画面上に赤色で表示される重大なエラーのみを対象とする
+            // （重複、休暇出勤、および出勤スタッフのシフト未入力）
+            const hasError = (v.overlaps && v.overlaps.size > 0) || 
+                             (v.leaveConflicts && v.leaveConflicts.size > 0) || 
+                             (v.receptionLeaveConflicts && v.receptionLeaveConflicts.size > 0) ||
+                             (v.missingAttendance && v.missingAttendance.size > 0);
+            if (hasError) {
+                errorIndicator = `<span class="tab-error" title="シフトの重複、未入力、休暇中の配置などのエラーがあります">⚠️ エラー</span>`;
+                tab.classList.add('has-error');
+            }
+        }
+
+        tab.innerHTML = `<span class="tab-day">${DAY_NAMES[dayIdx]}</span><span class="tab-date">${formatDate(d)}</span>${holidayName ? `<span class="tab-holiday">${holidayName}</span>` : ''}${errorIndicator}`;
         tab.addEventListener('click', () => switchDay(i));
         container.appendChild(tab);
     });
@@ -238,6 +255,14 @@ function setupHeaderButtons() {
     document.getElementById('btn-aggregate')?.addEventListener('click', openAggregateModal);
     document.getElementById('btn-monthly')?.addEventListener('click', () => openMonthlyModal());
     document.getElementById('btn-role-monthly')?.addEventListener('click', () => openRoleMonthlyModal());
+    document.getElementById('btn-bulk-shift-open')?.addEventListener('click', () => {
+        openBulkShiftModal();
+        const savedStart = localStorage.getItem('dsa_bulk_start_date');
+        const savedEnd = localStorage.getItem('dsa_bulk_end_date');
+        if (!savedStart || !savedEnd) {
+            updateBulkPeriodFromMonth(true); // isInit = true
+        }
+    });
     // メニュー関連
     const menuBtn = document.getElementById('btn-menu');
     const menuDropdown = document.getElementById('header-menu');
@@ -418,7 +443,7 @@ function updateSyncHeaderIcon() {
 
 // ------ モーダルclose設定 ------
 function setupModalClosers() {
-    ['modal-staff', 'modal-staff-list', 'modal-aggregate', 'modal-monthly', 'modal-role-monthly', 'modal-shift-edit', 'modal-leave', 'modal-sync', 'modal-app-settings'].forEach(setupModalClose);
+    ['modal-staff', 'modal-staff-list', 'modal-aggregate', 'modal-monthly', 'modal-role-monthly', 'modal-shift-edit', 'modal-leave', 'modal-sync', 'modal-app-settings', 'modal-bulk-shift'].forEach(setupModalClose);
 }
 
 // ------ キーボードショートカット ------
@@ -523,3 +548,355 @@ window.printModal = function (containerId = 'monthly-table-container', titleId =
 
 // ------ 起動 ------
 document.addEventListener('DOMContentLoaded', initApp);
+
+// ------ 一括休暇・スケジュール設定イベント ＆ アジャスト処理 ------
+function setupBulkShiftEvents() {
+    const startInput = document.getElementById('bulk-start-date');
+    const endInput = document.getElementById('bulk-end-date');
+
+    // Flatpickr の初期化 (日本語、月曜始まりを確実に適用)
+    const jaLocale = (typeof flatpickr !== 'undefined' && flatpickr.l10ns && flatpickr.l10ns.ja)
+        ? { ...flatpickr.l10ns.ja, firstDayOfWeek: 1 }
+        : { firstDayOfWeek: 1 };
+
+    if (startInput) {
+        flatpickr(startInput, {
+            locale: jaLocale,
+            dateFormat: "Y-m-d",
+            allowInput: true,  // キーボードからの手動入力も許可
+            onChange: function() {
+                // DOMへの値反映完了を確実に待ってから処理を実行する
+                setTimeout(() => {
+                    handleBulkPeriodChange();
+                }, 0);
+            }
+        });
+    }
+    if (endInput) {
+        flatpickr(endInput, {
+            locale: jaLocale,
+            dateFormat: "Y-m-d",
+            allowInput: true,  // キーボードからの手動入力も許可
+            onChange: function() {
+                // DOMへの値反映完了を確実に待ってから処理を実行する
+                setTimeout(() => {
+                    handleBulkPeriodChange();
+                }, 0);
+            }
+        });
+    }
+
+    // クイック月選択変更
+    document.getElementById('bulk-month-select')?.addEventListener('change', () => {
+        updateBulkPeriodFromMonth(false); // isInit = false
+    });
+
+    // 開始日・終了日の手動変更イベント
+    startInput?.addEventListener('change', () => {
+        handleBulkPeriodChange();
+    });
+    endInput?.addEventListener('change', () => {
+        handleBulkPeriodChange();
+    });
+
+    // 曜日チェックボックスのリアルタイム自動保存（Event Delegation）
+    document.getElementById('bulk-shift-tbody')?.addEventListener('change', (e) => {
+        if (!e.target.classList.contains('bulk-day-checkbox')) return;
+
+        const checkbox = e.target;
+        const staffId = checkbox.dataset.staffId;
+        const dayOfWeek = parseInt(checkbox.dataset.dayOfWeek, 10);
+        const isChecked = checkbox.checked;
+
+        const startDateStr = document.getElementById('bulk-start-date')?.value;
+        const endDateStr = document.getElementById('bulk-end-date')?.value;
+
+        if (!startDateStr || !endDateStr) {
+            showToast('error', '日付エラー', '日付範囲を設定してください。');
+            return;
+        }
+
+        // selectedDays 配列を構築 (0=日, 1=月... 6=土)
+        const selectedDays = Array(7).fill(false);
+        selectedDays[dayOfWeek] = true;
+
+        // チェックON = 出勤（shift-offを解除＝null）、チェックOFF = お休み（shift-offを設定）
+        const leaveType = isChecked ? null : 'shift-off';
+
+        const res = setBulkLeaves(staffId, startDateStr, endDateStr, selectedDays, leaveType, true);
+
+        if (res.success) {
+            const staff = getStaff(staffId);
+            const staffName = staff ? staff.name : 'スタッフ';
+            const dayName = DAY_NAMES[dayOfWeek];
+
+            if (isChecked) {
+                showToast('success', '設定保存', `【${staffName}】の ${dayName}曜日を出勤に設定しました。`);
+            } else {
+                showToast('info', '設定保存', `【${staffName}】の ${dayName}曜日をお休みに設定しました。`);
+            }
+
+            // メイン画面の再描画
+            onWeekChange();
+        } else {
+            showToast('error', '設定失敗', res.message || '一括設定に失敗しました。');
+        }
+    });
+}
+
+function updateBulkPeriodFromMonth(isInit = false) {
+    const monthSelect = document.getElementById('bulk-month-select');
+    const startInput = document.getElementById('bulk-start-date');
+    const endInput = document.getElementById('bulk-end-date');
+
+    if (!monthSelect || !startInput || !endInput) return;
+
+    const val = monthSelect.value;
+    if (!val) return;
+
+    // 1. まずその月専用の保存された個別期間があるか確認
+    const monthlyPeriodJson = localStorage.getItem(`dsa_bulk_period_${val}`);
+    let newStartStr = '';
+    let newEndStr = '';
+
+    if (monthlyPeriodJson) {
+        try {
+            const period = JSON.parse(monthlyPeriodJson);
+            if (period && period.start && period.end) {
+                newStartStr = period.start;
+                newEndStr = period.end;
+            }
+        } catch (e) {
+            console.error("Failed to parse monthly period", e);
+        }
+    }
+
+    // 2. 個別期間がない場合はデフォルトの月初〜月末を計算
+    if (!newStartStr || !newEndStr) {
+        const [year, month] = val.split('-').map(Number);
+        let startD = new Date(year, month - 1, 1);
+        let endD = new Date(year, month, 0);
+        newStartStr = _localDateStr(startD);
+        newEndStr = _localDateStr(endD);
+    }
+
+    startInput.value = newStartStr;
+    endInput.value = newEndStr;
+
+    // Flatpickr の表示値も同期
+    startInput._flatpickr?.setDate(newStartStr, false);
+    endInput._flatpickr?.setDate(newEndStr, false);
+
+    // 全体の最新期間として保存
+    localStorage.setItem('dsa_bulk_start_date', newStartStr);
+    localStorage.setItem('dsa_bulk_end_date', newEndStr);
+
+    if (isInit) {
+        startInput.dataset.prevVal = newStartStr;
+        endInput.dataset.prevVal = newEndStr;
+        renderBulkShiftTable();
+    } else {
+        handleBulkPeriodChange();
+    }
+}
+
+function handleBulkPeriodChange() {
+    const startInput = document.getElementById('bulk-start-date');
+    const endInput = document.getElementById('bulk-end-date');
+    const monthSelect = document.getElementById('bulk-month-select');
+    if (!startInput || !endInput) return;
+
+    const newStart = startInput.value;
+    const newEnd = endInput.value;
+    const prevStart = startInput.dataset.prevVal;
+    const prevEnd = endInput.dataset.prevVal;
+
+    if (newStart === prevStart && newEnd === prevEnd) return;
+
+    // 日付の妥当性チェック
+    if (!newStart || !newEnd || new Date(newStart) > new Date(newEnd)) {
+        return;
+    }
+
+    // 全体の最新期間として保存
+    localStorage.setItem('dsa_bulk_start_date', newStart);
+    localStorage.setItem('dsa_bulk_end_date', newEnd);
+
+    // 現在選択されている月専用の個別期間としても保存
+    const currentYM = monthSelect ? monthSelect.value : null;
+    if (currentYM) {
+        localStorage.setItem(`dsa_bulk_period_${currentYM}`, JSON.stringify({ start: newStart, end: newEnd }));
+    }
+
+    if (prevStart && prevEnd) {
+        showToast('info', '期間変更アジャスト', '変更された期間に合わせて、お休み設定を自動的に追従・適用しています...', 2000);
+
+        // 自身の月のアジャスト処理を実行
+        applyBulkAdjustmentForMonth(currentYM, prevStart, prevEnd, newStart, newEnd);
+
+        // 前後の月の重複防止スライド調整を実行
+        if (currentYM) {
+            adjustAdjacentMonths(currentYM, newStart, newEnd);
+        }
+
+        saveAll();
+        onWeekChange();
+    }
+
+    // prevValの更新とテーブルの再描画
+    startInput.dataset.prevVal = newStart;
+    endInput.dataset.prevVal = newEnd;
+    renderBulkShiftTable();
+}
+
+// ------ 前後の月の重複防止・自動スライド調整ヘルパー ------
+
+// 年月文字列(YYYY-MM)からoffset月移動した年月文字列(YYYY-MM)を取得する
+function getOffsetMonth(ymStr, offset) {
+    if (!ymStr) return "";
+    const [year, month] = ymStr.split('-').map(Number);
+    const date = new Date(year, month - 1 + offset, 1);
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
+}
+
+// 任意の月のお休み（通常休暇）設定を、古い期間から新しい期間へアジャスト（スライド追従）適用する
+function applyBulkAdjustmentForMonth(targetYM, oldStart, oldEnd, newStart, newEnd) {
+    if (!oldStart || !oldEnd || !newStart || !newEnd) return;
+    if (oldStart === newStart && oldEnd === newEnd) return;
+
+    State.staff.forEach(s => {
+        // 1. 古い期間で「お休み(false)」だった曜日を取得
+        const prevStates = getBulkDayCheckboxesState(s.id, oldStart, oldEnd);
+
+        // 2. お休み曜日について、古い期間をクリア、新しい期間に適用
+        for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek++) {
+            const isWorking = prevStates[dayOfWeek];
+            if (!isWorking) {
+                const selectedDays = Array(7).fill(false);
+                selectedDays[dayOfWeek] = true;
+
+                // 古い期間の休みをクリア
+                setBulkLeaves(s.id, oldStart, oldEnd, selectedDays, null, false);
+
+                // 新しい期間に休みを設定
+                setBulkLeaves(s.id, newStart, newEnd, selectedDays, 'shift-off', false);
+            }
+        }
+    });
+}
+
+// 今月の新しい期間 [startStr, endStr] に基づき、前月および翌月の期間重複を検知しスライド調整する
+function adjustAdjacentMonths(currentYM, startStr, endStr) {
+    if (!currentYM || !startStr || !endStr) return;
+
+    const currentStart = new Date(startStr);
+    const currentEnd = new Date(endStr);
+
+    // --- 1. 前月（前の月）の調整 ---
+    const prevYM = getOffsetMonth(currentYM, -1);
+    if (prevYM) {
+        let prevStartStr = '';
+        let prevEndStr = '';
+        const prevPeriodJson = localStorage.getItem(`dsa_bulk_period_${prevYM}`);
+        if (prevPeriodJson) {
+            try {
+                const period = JSON.parse(prevPeriodJson);
+                if (period && period.start && period.end) {
+                    prevStartStr = period.start;
+                    prevEndStr = period.end;
+                }
+            } catch (e) {
+                console.error("Failed to parse prev period", e);
+            }
+        }
+
+        // 保存データがない場合はデフォルトの月初〜月末
+        if (!prevStartStr || !prevEndStr) {
+            const [year, month] = prevYM.split('-').map(Number);
+            const startD = new Date(year, month - 1, 1);
+            const endD = new Date(year, month, 0);
+            prevStartStr = _localDateStr(startD);
+            prevEndStr = _localDateStr(endD);
+        }
+
+        // 前月の終了日のターゲット：今月の開始日の前日
+        const prevEndLimit = new Date(currentStart);
+        prevEndLimit.setDate(prevEndLimit.getDate() - 1);
+        const targetPrevEndStr = _localDateStr(prevEndLimit);
+
+        // 前月の現在の終了日とターゲットが異なる場合、強制的にスライド
+        if (prevEndStr !== targetPrevEndStr) {
+            const oldPrevStart = prevStartStr;
+            const oldPrevEnd = prevEndStr;
+
+            let newPrevStartStr = prevStartStr;
+            let newPrevStart = new Date(prevStartStr);
+
+            // 前月の開始日もターゲット終了日を超えてしまう場合は、開始日も終了日と同じにする
+            if (newPrevStart > prevEndLimit) {
+                newPrevStartStr = targetPrevEndStr;
+            }
+
+            // localStorageに保存
+            localStorage.setItem(`dsa_bulk_period_${prevYM}`, JSON.stringify({ start: newPrevStartStr, end: targetPrevEndStr }));
+
+            // お休みアジャスト処理をバックグラウンドで走らせる
+            applyBulkAdjustmentForMonth(prevYM, oldPrevStart, oldPrevEnd, newPrevStartStr, targetPrevEndStr);
+        }
+    }
+
+    // --- 2. 翌月（次の月）の調整 ---
+    const nextYM = getOffsetMonth(currentYM, 1);
+    if (nextYM) {
+        let nextStartStr = '';
+        let nextEndStr = '';
+        const nextPeriodJson = localStorage.getItem(`dsa_bulk_period_${nextYM}`);
+        if (nextPeriodJson) {
+            try {
+                const period = JSON.parse(nextPeriodJson);
+                if (period && period.start && period.end) {
+                    nextStartStr = period.start;
+                    nextEndStr = period.end;
+                }
+            } catch (e) {
+                console.error("Failed to parse next period", e);
+            }
+        }
+
+        // 保存データがない場合はデフォルト of 月初〜月末
+        if (!nextStartStr || !nextEndStr) {
+            const [year, month] = nextYM.split('-').map(Number);
+            const startD = new Date(year, month - 1, 1);
+            const endD = new Date(year, month, 0);
+            nextStartStr = _localDateStr(startD);
+            nextEndStr = _localDateStr(endD);
+        }
+
+        // 翌月の開始日のターゲット：今月の終了日の翌日
+        const nextStartLimit = new Date(currentEnd);
+        nextStartLimit.setDate(nextStartLimit.getDate() + 1);
+        const targetNextStartStr = _localDateStr(nextStartLimit);
+
+        // 翌月の現在の開始日とターゲットが異なる場合、強制的にスライド
+        if (nextStartStr !== targetNextStartStr) {
+            const oldNextStart = nextStartStr;
+            const oldNextEnd = nextEndStr;
+
+            let newNextEndStr = nextEndStr;
+            let newNextEnd = new Date(nextEndStr);
+
+            // 翌月の終了日もターゲット開始日未満になってしまう場合は、終了日も開始日と同じにする
+            if (newNextEnd < nextStartLimit) {
+                newNextEndStr = targetNextStartStr;
+            }
+
+            // localStorageに保存
+            localStorage.setItem(`dsa_bulk_period_${nextYM}`, JSON.stringify({ start: targetNextStartStr, end: newNextEndStr }));
+
+            // お休みアジャスト処理をバックグラウンドで走らせる
+            applyBulkAdjustmentForMonth(nextYM, oldNextStart, oldNextEnd, targetNextStartStr, newNextEndStr);
+        }
+    }
+}

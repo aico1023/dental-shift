@@ -824,7 +824,8 @@ function pasteToCurrentDay() {
   showToast('success', '一日貼り付け', 'この日のシフトを上書き貼り付けしました。');
 }
 
-// ---- シフト管理（期間指定一括登録） ----
+// ---- 期間指定一括シフト登録機能 ----
+// ---- 期間指定一括シフト登録機能 ----
 function addBulkShifts(staffId, unitNum, startDateStr, endDateStr, startTimeStr, endTimeStr, skipHolidays, selectedDays = null, triggerSave = true) {
   const staff = getStaff(staffId);
   if (!staff) return { success: false, message: 'スタッフが見つかりません。' };
@@ -1077,43 +1078,7 @@ function addBulkShiftsGroup(configs, startDateStr, endDateStr, startTimeStr, end
   };
 }
 
-// 指定された日にスタッフがシフト（ユニット配置または受付）に入っているか判定するヘルパー関数
-function isStaffAssignedOnDay(staffId, weekKey, dayKey) {
-  const targetStaffIdStr = String(staffId);
-
-  // 1. ユニットシフトの確認
-  for (let u = 1; u <= TOTAL_UNITS; u++) {
-    const arr = getUnitShifts(weekKey, dayKey, u);
-    for (const sh of arr) {
-      if (!sh) continue;
-      
-      const doctors = sh.doctorId ? [String(sh.doctorId)] : [];
-      const dhs = Array.isArray(sh.dhIds) ? sh.dhIds.map(String) : [];
-      const das = Array.isArray(sh.daIds) ? sh.daIds.map(String) : [];
-      const dts = Array.isArray(sh.dtIds) ? sh.dtIds.map(String) : [];
-      const tcs = Array.isArray(sh.tcIds) ? sh.tcIds.map(String) : [];
-      
-      const allStaffInShift = [...doctors, ...dhs, ...das, ...dts, ...tcs];
-      if (allStaffInShift.includes(targetStaffIdStr)) {
-        return true;
-      }
-    }
-  }
-
-  // 2. 受付シフトの確認
-  const rc = getDayReception(weekKey, dayKey);
-  if (rc) {
-    const amList = Array.isArray(rc.am) ? rc.am.map(String) : [];
-    const pmList = Array.isArray(rc.pm) ? rc.pm.map(String) : [];
-    if (amList.includes(targetStaffIdStr) || pmList.includes(targetStaffIdStr)) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-// ---- シフト管理（出勤・お休み一括設定） ----
+// ---- 期間指定一括休暇（出勤・お休み）設定機能 ----
 function setBulkLeaves(staffId, startDateStr, endDateStr, selectedDays, leaveType, triggerSave = true) {
   const staff = getStaff(staffId);
   if (!staff) return { success: false, message: 'スタッフが見つかりません。' };
@@ -1148,9 +1113,32 @@ function setBulkLeaves(staffId, startDateStr, endDateStr, selectedDays, leaveTyp
     }
 
     // シフトで「お休み（shift-off / normal-leave）」に設定しようとしている場合、
-    // シフト表（ユニット配置・受付）に実際に出勤シフトが登録されている日は上書きせずスキップする
+    // シフト表（ユニット配置）に実際に出勤シフトが登録されている日（出勤になっている所）は上書きせずスキップする
     if (leaveType === 'shift-off' || leaveType === 'normal-leave') {
-      if (isStaffAssignedOnDay(staffId, wk, dk)) {
+      let hasShift = false;
+      const targetStaffIdStr = String(staffId);
+      
+      for (let u = 1; u <= TOTAL_UNITS; u++) {
+        const arr = getUnitShifts(wk, dk, u);
+        for (const sh of arr) {
+          if (!sh) continue;
+          
+          // 各種アサインIDを安全に文字列配列化する
+          const doctors = sh.doctorId ? [String(sh.doctorId)] : [];
+          const dhs = Array.isArray(sh.dhIds) ? sh.dhIds.map(String) : [];
+          const das = Array.isArray(sh.daIds) ? sh.daIds.map(String) : [];
+          const dts = Array.isArray(sh.dtIds) ? sh.dtIds.map(String) : [];
+          const tcs = Array.isArray(sh.tcIds) ? sh.tcIds.map(String) : [];
+          
+          const allStaffInShift = [...doctors, ...dhs, ...das, ...dts, ...tcs];
+          if (allStaffInShift.includes(targetStaffIdStr)) {
+            hasShift = true;
+            break;
+          }
+        }
+        if (hasShift) break;
+      }
+      if (hasShift) {
         currentD.setDate(currentD.getDate() + 1);
         continue;
       }
@@ -1170,8 +1158,7 @@ function setBulkLeaves(staffId, startDateStr, endDateStr, selectedDays, leaveTyp
 }
 
 // 期間内で各曜日が「出勤（チェックON）」か「休暇（チェックOFF）」かを判定するヘルパー
-// アサイン保護により特定の日にシフトが残っていても、他の非配置日の設定が正しく反映されるよう、
-// シフトに入っていない日の設定状態を優先して判定する
+// 期間内の最初の該当曜日に 'shift-off'、'normal-leave'、'paid' 等が入っていれば休暇(false)、無ければ出勤(true)とする
 function getBulkDayCheckboxesState(staffId, startDateStr, endDateStr) {
   const startD = parseLocalDate(startDateStr);
   const endD = parseLocalDate(endDateStr);
@@ -1181,41 +1168,32 @@ function getBulkDayCheckboxesState(staffId, startDateStr, endDateStr) {
     return states;
   }
 
-  // 各曜日について該当する日付をリスト化
-  const daysByWeekDay = Array.from({ length: 7 }, () => []);
   const currentD = new Date(startD);
+  const checkedDays = Array(7).fill(false);
+
   while (currentD <= endD) {
-    daysByWeekDay[currentD.getDay()].push(new Date(currentD));
-    currentD.setDate(currentD.getDate() + 1);
-  }
-
-  for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek++) {
-    const dates = daysByWeekDay[dayOfWeek];
-    if (dates.length === 0) continue;
-
-    // シフトに入っていない日を優先的に探す
-    let targetDate = null;
-    for (const d of dates) {
-      const dk = dayKeyFromDate(d);
-      const wk = weekKeyFromDate(getWeekStart(d));
-      if (!isStaffAssignedOnDay(staffId, wk, dk)) {
-        targetDate = d;
-        break;
+    const dayOfWeek = currentD.getDay();
+    // 各曜日について、期間内で最初に見つかった日の休暇状態を代表値とする
+    if (!checkedDays[dayOfWeek]) {
+      const dk = dayKeyFromDate(currentD);
+      const wk = weekKeyFromDate(getWeekStart(currentD));
+      const leaveType = getLeaveRecord(wk, staffId, dk);
+      
+      // 出勤系設定('working-day', 'comz-vibshutu', 'other-vibshutu')または未設定であればチェックON(出勤)
+      const isAttendance = !leaveType || leaveType === 'working-day' || leaveType === 'comz-vibshutu' || leaveType === 'other-vibshutu';
+      if (isAttendance) {
+        states[dayOfWeek] = true;
+      } else {
+        states[dayOfWeek] = false; // 休暇設定が入っていればチェックOFF
       }
+      checkedDays[dayOfWeek] = true;
     }
-
-    // もしすべての日にシフトが入っている場合は、最初の該当曜日を代表とする
-    if (!targetDate) {
-      targetDate = dates[0];
+    
+    // 7つの曜日すべてチェックし終わったらループを抜ける
+    if (checkedDays.every(v => v)) {
+      break;
     }
-
-    const dk = dayKeyFromDate(targetDate);
-    const wk = weekKeyFromDate(getWeekStart(targetDate));
-    const leaveType = getLeaveRecord(wk, staffId, dk);
-
-    // 出勤系設定('working-day', 'comz-vibshutu', 'other-vibshutu')または未設定であればチェックON(出勤)
-    const isAttendance = !leaveType || leaveType === 'working-day' || leaveType === 'comz-vibshutu' || leaveType === 'other-vibshutu';
-    states[dayOfWeek] = isAttendance;
+    currentD.setDate(currentD.getDate() + 1);
   }
 
   return states;

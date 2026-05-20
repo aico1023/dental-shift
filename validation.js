@@ -85,7 +85,7 @@ function checkDrlessWarnings(weekKey, dayKey) {
 function checkLeaveConflicts(weekKey, dayKey) {
     const conflicts = new Set(); // shiftId
     const dayShifts = getDayShifts(weekKey, dayKey);
-    const leaveTypesToFlag = ['paid', 'happy', 'other-vibkyuu', 'normal-leave'];
+    const leaveTypesToFlag = ['paid', 'happy', 'other-vibkyuu', 'normal-leave', 'shift-off'];
 
     for (let u = 1; u <= TOTAL_UNITS; u++) {
         const arr = getUnitShifts(weekKey, dayKey, u);
@@ -114,15 +114,35 @@ function checkLeaveConflicts(weekKey, dayKey) {
     return { shiftConflicts: conflicts, receptionConflicts: rcConflicts };
 }
 
-// 出勤（振出）なのにシフトがないチェック
+// 出勤（お休みではない）のにシフトがないチェック
 function checkAttendanceRequirements(weekKey, dayKey) {
     const missingShiftStaff = new Set(); // staffId
-    const attendanceTypes = ['working-day', 'comz-vibshutu', 'other-vibshutu'];
 
-    // 振出設定されているスタッフを抽出
+    // 曜日の判定 (0: 日曜日)
+    const d = new Date(dayKey);
+    const isSunday = d.getDay() === 0;
+
+    // 休診日（祝日やカスタム休日、または日曜日）の場合は、そもそもシフトがないため未配置エラーを出さない
+    if ((typeof getHolidayName === 'function' && getHolidayName(dayKey)) || isSunday) {
+        return missingShiftStaff;
+    }
+
+    // 院長2枠と矯正枠は、シフトの有無にかかわらず常にエラーにしない（除外する）
+    const isExcludedStaff = (name) => {
+        const n = name.replace(/\s+/g, '');
+        return n.includes('院長2') || n.includes('院長２') || n.includes('院長3') || n.includes('院長３') || n.includes('Dr2') || n.includes('Dr２') || n.includes('矯正');
+    };
+
+    // 出勤者（お休み設定が入っていないメンバー）を抽出
     State.staff.forEach(s => {
+        if (isExcludedStaff(s.name)) return;
+
         const leaveType = getLeaveRecord(weekKey, s.id, dayKey);
-        if (leaveType && attendanceTypes.includes(leaveType)) {
+        const leaveInfo = leaveType ? (typeof LEAVE_TYPES !== 'undefined' ? LEAVE_TYPES[leaveType] : null) : null;
+        const isAttendance = leaveType === 'working-day' || leaveType === 'comz-vibshutu' || leaveType === 'other-vibshutu';
+        const isAbsent = leaveInfo && !isAttendance;
+
+        if (!isAbsent) {
             // シフトに入っているか確認
             let hasShift = false;
             // ユニットシフト
