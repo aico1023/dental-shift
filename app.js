@@ -607,6 +607,8 @@ function setupBulkShiftEvents() {
         const startDateStr = document.getElementById('bulk-start-date')?.value;
         const endDateStr = document.getElementById('bulk-end-date')?.value;
 
+        console.log('[bulk] change fired:', { staffId, dayOfWeek, isChecked, startDateStr, endDateStr });
+
         if (!startDateStr || !endDateStr) {
             showToast('error', '日付エラー', '日付範囲を設定してください。');
             return;
@@ -620,21 +622,30 @@ function setupBulkShiftEvents() {
         const leaveType = isChecked ? null : 'shift-off';
 
         const res = setBulkLeaves(staffId, startDateStr, endDateStr, selectedDays, leaveType, true);
+        console.log('[bulk] setBulkLeaves result:', res);
 
         if (res.success) {
             const staff = getStaff(staffId);
             const staffName = staff ? staff.name : 'スタッフ';
             const dayName = DAY_NAMES[dayOfWeek];
 
+            if (res.count === 0 && res.skipped > 0) {
+                // 1件も変更されず、全て保護スキップされた場合
+                checkbox.checked = !isChecked; // UIを元に戻す
+                showToast('error', '変更できません', `すでにシフト配置等があるため、${dayName}曜日の設定を変更できませんでした。(対象0件, 保護${res.skipped}件)`);
+                return;
+            }
+
             if (isChecked) {
-                showToast('success', '設定保存', `【${staffName}】の ${dayName}曜日を出勤に設定しました。`);
+                showToast('success', '設定保存', `【${staffName}】の ${dayName}曜日を出勤にしました。(更新${res.count}件, スキップ${res.skipped}件)`);
             } else {
-                showToast('info', '設定保存', `【${staffName}】の ${dayName}曜日をお休みに設定しました。`);
+                showToast('info', '設定保存', `【${staffName}】の ${dayName}曜日をお休みにしました。(更新${res.count}件, スキップ${res.skipped}件)`);
             }
 
             // メイン画面の再描画
             onWeekChange();
         } else {
+            checkbox.checked = !isChecked; // UIを元に戻す
             showToast('error', '設定失敗', res.message || '一括設定に失敗しました。');
         }
     });

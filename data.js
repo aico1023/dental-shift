@@ -350,6 +350,8 @@ function cleanupOldData(months) {
   return removedCount;
 }
 
+let _isSavingToCloud = false;
+
 function saveAll() {
   const currentState = {
     staff: State.staff,
@@ -376,6 +378,7 @@ function saveAll() {
     // クラウドモードの場合、GASにPOST送信
     if (isCloudSyncEnabled()) {
       showToast('info', '同期中...', '設定されたクラウドへデータを保存しています', 2000);
+      _isSavingToCloud = true;
       
       // クラウド保存時はデータを短縮化（圧縮）して送信する
       const optimized = optimizeState(currentState);
@@ -389,6 +392,7 @@ function saveAll() {
       })
         .then(res => res.json())
         .then(data => {
+          _isSavingToCloud = false;
           if (data.status === 'success') {
             showToast('success', 'クラウド保存完了', 'データがクラウドに保存されました');
           } else {
@@ -396,6 +400,7 @@ function saveAll() {
           }
         })
         .catch(err => {
+          _isSavingToCloud = false;
           console.error('Cloud Sync Save Error:', err);
           showToast('error', 'クラウド保存失敗', 'エラーが発生しました: ' + err.message);
         });
@@ -406,7 +411,12 @@ function saveAll() {
 
 function loadAll(forceCloud = false) {
   // ① クラウド読み込みの実行
-  if (isCloudSyncEnabled() && window.fetch && (forceCloud || true)) {
+  if (isCloudSyncEnabled() && window.fetch && forceCloud) {
+    // 保存中に上書きが走るのを防ぐ
+    if (_isSavingToCloud) {
+      console.warn('[loadAll] クラウド保存中のため読み込みをスキップします');
+      return _loadFromLocal();
+    }
     showToast('info', '同期確認', 'クラウドからデータを取得しています...', 2000);
 
     // GASのキャッシュ回避用のタイムスタンプ
@@ -1125,6 +1135,8 @@ function setBulkLeaves(staffId, startDateStr, endDateStr, selectedDays, leaveTyp
   }
 
   let count = 0;
+  let skipped = 0;
+  
   const currentD = new Date(startD);
 
   while (currentD <= endD) {
@@ -1141,8 +1153,10 @@ function setBulkLeaves(staffId, startDateStr, endDateStr, selectedDays, leaveTyp
     
     // 既存の休暇設定を取得
     const existingLeave = getLeaveRecord(wk, staffId, dk);
+    
     // 有給休暇や特別休暇（shift-offやnormal-leave以外の個別休暇設定）、または手動出勤日が設定されている日は保護し、一括設定による上書きをスキップする
     if (existingLeave !== null && existingLeave !== 'shift-off' && existingLeave !== 'normal-leave') {
+      skipped++;
       currentD.setDate(currentD.getDate() + 1);
       continue;
     }
@@ -1151,6 +1165,7 @@ function setBulkLeaves(staffId, startDateStr, endDateStr, selectedDays, leaveTyp
     // シフト表（ユニット配置・受付）に実際に出勤シフトが登録されている日は上書きせずスキップする
     if (leaveType === 'shift-off' || leaveType === 'normal-leave') {
       if (isStaffAssignedOnDay(staffId, wk, dk)) {
+        skipped++;
         currentD.setDate(currentD.getDate() + 1);
         continue;
       }
@@ -1162,11 +1177,11 @@ function setBulkLeaves(staffId, startDateStr, endDateStr, selectedDays, leaveTyp
     currentD.setDate(currentD.getDate() + 1);
   }
 
-  if (triggerSave && count > 0) {
+  if (triggerSave) {
     saveAll();
   }
 
-  return { success: true, count };
+  return { success: true, count, skipped };
 }
 
 // 期間内で各曜日が「出勤（チェックON）」か「休暇（チェックOFF）」かを判定するヘルパー
@@ -1193,29 +1208,22 @@ function getBulkDayCheckboxesState(staffId, startDateStr, endDateStr) {
     const dates = daysByWeekDay[dayOfWeek];
     if (dates.length === 0) continue;
 
-    // シフトに入っていない日を優先的に探す
-    let targetDate = null;
+    let allDaysAreAbsent = true;
+
     for (const d of dates) {
       const dk = dayKeyFromDate(d);
       const wk = weekKeyFromDate(getWeekStart(d));
-      if (!isStaffAssignedOnDay(staffId, wk, dk)) {
-        targetDate = d;
+      const leaveType = getLeaveRecord(wk, staffId, dk);
+
+      // 未設定、出勤系の設定、または有給等の個別設定（一括休み以外）は「出勤（チェックON）扱い」とする
+      if (!leaveType || leaveType === 'working-day' || leaveType === 'comz-vibshutu' || leaveType === 'other-vibshutu' || (leaveType !== 'shift-off' && leaveType !== 'normal-leave')) {
+        allDaysAreAbsent = false;
         break;
       }
     }
 
-    // もしすべての日にシフトが入っている場合は、最初の該当曜日を代表とする
-    if (!targetDate) {
-      targetDate = dates[0];
-    }
-
-    const dk = dayKeyFromDate(targetDate);
-    const wk = weekKeyFromDate(getWeekStart(targetDate));
-    const leaveType = getLeaveRecord(wk, staffId, dk);
-
-    // 出勤系設定('working-day', 'comz-vibshutu', 'other-vibshutu')または未設定であればチェックON(出勤)
-    const isAttendance = !leaveType || leaveType === 'working-day' || leaveType === 'comz-vibshutu' || leaveType === 'other-vibshutu';
-    states[dayOfWeek] = isAttendance;
+    // すべての該当日が休み(shift-off/normal-leave)の場合のみチェックOFF
+    states[dayOfWeek] = !allDaysAreAbsent;
   }
 
   return states;
