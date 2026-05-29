@@ -244,12 +244,26 @@ function setupHeaderButtons() {
         saveAll();
         showToast('success', '保存完了', '週シフトを保存しました。');
     });
-    document.getElementById('btn-copy-prev')?.addEventListener('click', () => {
-        if (!confirm('前週のシフトをコピーしますか？（現在のシフトは上書きされます）')) return;
-        copyPrevWeek();
-        buildTimeline(currentWeekKey(), currentDayKey());
-        showToast('success', '前週コピー', '前週のシフトをコピーしました。');
+
+    // 1日ごとの直感的なコピー＆ペースト
+    document.getElementById('btn-copy-current-day')?.addEventListener('click', () => {
+        const headerMenu = document.getElementById('header-menu');
+        if (headerMenu) headerMenu.style.display = 'none';
+        copyCurrentDay();
     });
+
+    document.getElementById('btn-paste-current-day')?.addEventListener('click', () => {
+        const headerMenu = document.getElementById('header-menu');
+        if (headerMenu) headerMenu.style.display = 'none';
+        
+        if (!State.dayClipboard) {
+            showToast('warning', '貼り付け不可', 'コピーされた一日のデータがありません。先に「コピー」を行ってください。');
+            return;
+        }
+        if (!confirm('コピーしたシフトをこの日に貼り付けますか？（上書きされます）')) return;
+        pasteToCurrentDay();
+    });
+
     document.getElementById('btn-template-save')?.addEventListener('click', openTemplateSaveModal);
     document.getElementById('btn-template-apply')?.addEventListener('click', openTemplateApplyModal);
     document.getElementById('btn-aggregate')?.addEventListener('click', openAggregateModal);

@@ -7,6 +7,7 @@
   <title>歯科医院 シフト管理システム</title>
   <meta name="description" content="歯科医院向け週単位シフト作成・管理アプリ。30名規模対応、ユニット別タイムライン管理。">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <style>
     /* 休暇管理モーダルのスクロールバー強化 */
     #leave-grid-container::-webkit-scrollbar {
@@ -87,10 +88,13 @@
 
         <div class="dropdown-container" id="menu-dropdown-container">
           <button class="btn btn-ghost" id="btn-menu">⚙️ その他</button>
-          <div class="dropdown-menu" id="header-menu" style="display:none;">
+            <div class="dropdown-menu" id="header-menu" style="display:none;">
             <div class="dropdown-item" id="btn-staff-list">👥 スタッフ一覧</div>
+            <div class="dropdown-item" id="btn-bulk-shift-open">📅 シフト管理</div>
             <div class="dropdown-divider"></div>
-            <div class="dropdown-item" id="btn-copy-prev" title="前週シフトをコピー">📋 前週コピー</div>
+            <div class="dropdown-item" id="btn-copy-current-day" title="現在表示中の1日のシフトをコピー">📋 この日をコピー</div>
+            <div class="dropdown-item" id="btn-paste-current-day" title="コピーしたシフトを現在表示中の日に貼り付け">📌 この日にペースト</div>
+            <div class="dropdown-divider"></div>
             <div class="dropdown-item" id="btn-template-apply" title="テンプレート適用">📂 テンプレ適用</div>
             <div class="dropdown-item" id="btn-template-save" title="テンプレートに保存">💾 テンプレ保存</div>
             <div class="dropdown-divider"></div>
@@ -176,6 +180,8 @@
                   value="dh">DH</label>
               <label class="radio-btn" data-radio="sm-role" data-value="da"><input type="radio" name="role"
                   value="da">DA</label>
+              <label class="radio-btn" data-radio="sm-role" data-value="dt"><input type="radio" name="role"
+                  value="dt">DT</label>
               <label class="radio-btn" data-radio="sm-role" data-value="reception"><input type="radio" name="role"
                   value="reception">TC</label>
             </div>
@@ -192,6 +198,15 @@
                 value="fulltime">常勤</label>
             <label class="radio-btn" data-radio="sm-emp" data-value="parttime"><input type="radio" name="emp"
                 value="parttime">非常勤</label>
+          </div>
+        </div>
+        <div class="form-group" id="sm-dr-assist-row" style="display:none">
+          <label class="form-label">アシスト設定</label>
+          <div class="radio-group">
+            <label class="radio-btn selected" data-radio="sm-dr-assist" data-value="true"><input type="radio" name="drAssist"
+                value="true">アシスト必要</label>
+            <label class="radio-btn" data-radio="sm-dr-assist" data-value="false"><input type="radio" name="drAssist"
+                value="false">アシスト不要</label>
           </div>
         </div>
         <div class="form-group" id="sm-assist-row" style="display:none">
@@ -347,9 +362,9 @@
             <option value="dr">Dr (歯科医師)</option>
             <option value="da">DA (助手)</option>
             <option value="dh">DH (衛生士)</option>
-            <option value="reception">TC (受付)</option>
+            <option value="tc_dt">TC & DT</option>
           </select>
-          <button class="btn btn-ghost btn-sm" id="btn-role-monthly-print" title="印刷する" onclick="window.printModal('role-monthly-table-container', 'role-monthly-title')">🖨️ 印刷</button>
+          <button class="btn btn-ghost btn-sm" id="btn-role-monthly-print" title="印刷する" onclick="window.printModal('role-monthly-table-container', 'role-monthly-title', 'portrait')">🖨️ 印刷</button>
           <button class="modal-close" data-close>✕</button>
         </div>
       </div>
@@ -448,7 +463,65 @@
     </div>
   </div>
 
+  <!-- ========== MODAL: シフト管理 ========== -->
+  <div class="modal-overlay" id="modal-bulk-shift">
+    <div class="modal modal-xl" style="width:95vw; max-width:780px; z-index: 10000; height: 90vh; max-height: 700px; display: flex; flex-direction: column;">
+      <div class="modal-header">
+        <span class="modal-title">📅 シフト管理</span>
+        <button class="modal-close" data-close>✕</button>
+      </div>
+      <div class="modal-body" style="overflow: hidden; display: flex; flex-direction: column; gap: 15px; flex: 1;">
+        <!-- 上部共通設定 -->
+        <div class="bulk-settings-row" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid var(--border); align-items: center;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" style="font-size:11px; margin-bottom:4px;">対象月クイック設定</label>
+            <select id="bulk-month-select" class="form-control" style="font-size:12px;"></select>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" style="font-size:11px; margin-bottom:4px;">開始日 *</label>
+            <input type="text" id="bulk-start-date" class="form-control" style="font-size:12px;" placeholder="年-月-日">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" style="font-size:11px; margin-bottom:4px;">終了日 *</label>
+            <input type="text" id="bulk-end-date" class="form-control" style="font-size:12px;" placeholder="年-月-日">
+          </div>
+        </div>
+
+        <!-- タブ領域追加 -->
+        <!-- タブ領域追加 -->
+        <div id="bulk-shift-role-tabs" style="display: flex; gap: 8px; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px;"></div>
+
+        <!-- 週間グリッド表エリア -->
+        <div style="flex: 1; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px;">
+          <table class="bulk-shift-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 12px;">
+            <thead style="position: sticky; top: 0; background: #f1f5f9; z-index: 10; box-shadow: 0 1px 0 rgba(0,0,0,0.1);">
+              <tr>
+                <th style="padding: 10px 12px; font-weight: 700; color: #475569; width: 220px;">スタッフ</th>
+                <th style="padding: 10px 6px; text-align: center; font-weight: 700; color: #475569; width: 60px;">月</th>
+                <th style="padding: 10px 6px; text-align: center; font-weight: 700; color: #475569; width: 60px;">火</th>
+                <th style="padding: 10px 6px; text-align: center; font-weight: 700; color: #475569; width: 60px;">水</th>
+                <th style="padding: 10px 6px; text-align: center; font-weight: 700; color: #475569; width: 60px;">木</th>
+                <th style="padding: 10px 6px; text-align: center; font-weight: 700; color: #475569; width: 60px;">金</th>
+                <th style="padding: 10px 6px; text-align: center; font-weight: 700; color: #475569; width: 60px;">土</th>
+                <th style="padding: 10px 6px; text-align: center; font-weight: 700; color: #475569; width: 60px;">日</th>
+              </tr>
+            </thead>
+            <tbody id="bulk-shift-tbody">
+              <!-- JSで動的にスタッフ行を生成 -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer" style="margin-top: 0; border-top: 1px solid var(--border); padding-top: 15px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">✨ 期間を設定し、曜日をチェックするだけで自動的にお休み（通常休暇）と出勤が切り替わります。</div>
+        <button class="btn btn-ghost" data-close>閉じる</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ========== SCRIPTS ========== -->
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
   <script src="holidays.js"></script>
   <script src="data.js"></script>
   <script src="validation.js"></script>

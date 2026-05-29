@@ -765,6 +765,70 @@ function clearUnitShifts() {
   saveAll();
 }
 
+// ---- 特定日を指定日（複数可）へコピー ----
+function copyDayShifts(sourceDateStr, targetDatesArr) {
+  const sourceDate = parseLocalDate(sourceDateStr);
+  const sourceWeekKey = weekKeyFromDate(getWeekStart(sourceDate));
+  const sourceDayKey = dayKeyFromDate(sourceDate);
+
+  const shifts = State.weekShifts[sourceWeekKey] && State.weekShifts[sourceWeekKey][sourceDayKey] 
+    ? JSON.parse(JSON.stringify(State.weekShifts[sourceWeekKey][sourceDayKey])) 
+    : {};
+    
+  const reception = State.receptionShifts[sourceWeekKey] && State.receptionShifts[sourceWeekKey][sourceDayKey]
+    ? JSON.parse(JSON.stringify(State.receptionShifts[sourceWeekKey][sourceDayKey]))
+    : { am: [], pm: [] };
+
+  const unitNames = State.unitNames[sourceDayKey]
+    ? JSON.parse(JSON.stringify(State.unitNames[sourceDayKey]))
+    : null;
+
+  let copiedCount = 0;
+
+  targetDatesArr.forEach(targetDateStr => {
+    if (!targetDateStr) return;
+    const targetDate = parseLocalDate(targetDateStr);
+    const targetWeekKey = weekKeyFromDate(getWeekStart(targetDate));
+    const targetDayKey = dayKeyFromDate(targetDate);
+    
+    const holidayName = getHolidayName(targetDayKey);
+    if (holidayName) {
+      // 祝日の場合はスキップ
+      return;
+    }
+
+    // 1. シフトの貼り付け
+    if (!State.weekShifts[targetWeekKey]) State.weekShifts[targetWeekKey] = {};
+    State.weekShifts[targetWeekKey][targetDayKey] = JSON.parse(JSON.stringify(shifts));
+    
+    // シフトIDの再生成
+    Object.values(State.weekShifts[targetWeekKey][targetDayKey]).forEach(arr => {
+      if (Array.isArray(arr)) {
+        arr.forEach(sh => { sh.id = newShiftId(); });
+      }
+    });
+
+    // 2. 受付シフトの貼り付け
+    if (!State.receptionShifts[targetWeekKey]) State.receptionShifts[targetWeekKey] = {};
+    State.receptionShifts[targetWeekKey][targetDayKey] = JSON.parse(JSON.stringify(reception));
+
+    // 3. ユニット名の貼り付け
+    if (unitNames) {
+      State.unitNames[targetDayKey] = JSON.parse(JSON.stringify(unitNames));
+    } else {
+      delete State.unitNames[targetDayKey];
+    }
+    
+    copiedCount++;
+  });
+
+  if (copiedCount > 0) {
+    saveAll();
+  }
+  
+  return copiedCount;
+}
+
 // ---- 一日シフトコピー・貼り付け機能 ----
 function copyCurrentDay() {
   const wk = currentWeekKey();
