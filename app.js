@@ -605,6 +605,76 @@ function setupBulkShiftEvents() {
         updateBulkPeriodFromMonth(false); // isInit = false
     });
 
+    // 先月からコピー
+    document.getElementById('btn-copy-prev-month')?.addEventListener('click', () => {
+        const monthSelect = document.getElementById('bulk-month-select');
+        const startInput = document.getElementById('bulk-start-date');
+        const endInput = document.getElementById('bulk-end-date');
+        
+        if (!monthSelect || !startInput || !endInput) return;
+        
+        const currentYM = monthSelect.value;
+        if (!currentYM) return;
+        
+        // 先月の算出 (YYYY-MM)
+        const [year, month] = currentYM.split('-').map(Number);
+        const prevDate = new Date(year, month - 2, 1);
+        const prevYM = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+        
+        if (!confirm(`${currentYM} のシフト設定（曜日ごと）を、先月（${prevYM}）の設定からコピーして上書きしますか？\n※全スタッフのシフトパターンがコピーされます。`)) {
+            return;
+        }
+
+        // 先月の開始日と終了日を取得
+        const prevMonthlyPeriodJson = localStorage.getItem(`dsa_bulk_period_${prevYM}`);
+        let prevStartStr = '';
+        let prevEndStr = '';
+        if (prevMonthlyPeriodJson) {
+            try {
+                const period = JSON.parse(prevMonthlyPeriodJson);
+                if (period && period.start && period.end) {
+                    prevStartStr = period.start;
+                    prevEndStr = period.end;
+                }
+            } catch(e) {}
+        }
+        if (!prevStartStr || !prevEndStr) {
+            const startD = new Date(prevDate.getFullYear(), prevDate.getMonth(), 1);
+            const endD = new Date(prevDate.getFullYear(), prevDate.getMonth() + 1, 0);
+            prevStartStr = _localDateStr(startD);
+            prevEndStr = _localDateStr(endD);
+        }
+
+        const targetStartStr = startInput.value;
+        const targetEndStr = endInput.value;
+
+        if (!targetStartStr || !targetEndStr) {
+            showToast('error', 'エラー', '対象月の期間が設定されていません。');
+            return;
+        }
+
+        // 全スタッフに対して、先月の設定を取得し、今月に適用
+        State.staff.forEach(s => {
+            const prevDayStates = getBulkDayCheckboxesState(s.id, prevStartStr, prevEndStr);
+            for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek++) {
+                const isChecked = prevDayStates[dayOfWeek];
+                const selectedDays = Array(7).fill(false);
+                selectedDays[dayOfWeek] = true;
+                const leaveType = isChecked ? null : 'shift-off';
+                
+                // setBulkLeavesを呼び出して保存
+                setBulkLeaves(s.id, targetStartStr, targetEndStr, selectedDays, leaveType, true);
+            }
+        });
+
+        // テーブルを再描画
+        if (typeof renderBulkShiftTable === 'function') {
+            renderBulkShiftTable();
+        }
+        
+        showToast('success', 'コピー完了', `先月（${prevYM}）のシフト設定を全スタッフにコピーしました。`);
+    });
+
     // 開始日・終了日の手動変更イベント
     // ※ Flatpickr の onChange で既に handleBulkPeriodChange を呼んでいるため
     //   ここでは二重実行を避けるために登録しない

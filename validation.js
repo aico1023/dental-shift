@@ -118,14 +118,8 @@ function checkLeaveConflicts(weekKey, dayKey) {
 function checkAttendanceRequirements(weekKey, dayKey) {
     const missingShiftStaff = new Set(); // staffId
 
-    // 曜日の判定 (0: 日曜日)
-    const d = new Date(dayKey);
-    const isSunday = d.getDay() === 0;
-
-    // 休診日（祝日やカスタム休日、または日曜日）の場合は、そもそもシフトがないため未配置エラーを出さない
-    if ((typeof getHolidayName === 'function' && getHolidayName(dayKey)) || isSunday) {
-        return missingShiftStaff;
-    }
+    // 祝日やカスタム休日の判定
+    const isHolidayOrClosed = typeof getHolidayName === 'function' && getHolidayName(dayKey);
 
     // 院長2枠と矯正枠は、シフトの有無にかかわらず常にエラーにしない（除外する）
     const isExcludedStaff = (name) => {
@@ -140,7 +134,18 @@ function checkAttendanceRequirements(weekKey, dayKey) {
         const leaveType = getLeaveRecord(weekKey, s.id, dayKey);
         const leaveInfo = leaveType ? (typeof LEAVE_TYPES !== 'undefined' ? LEAVE_TYPES[leaveType] : null) : null;
         const isAttendance = leaveType === 'working-day' || leaveType === 'comz-vibshutu' || leaveType === 'other-vibshutu';
-        const isAbsent = leaveInfo && !isAttendance;
+        
+        let isAbsent;
+        if (leaveType) {
+            isAbsent = !isAttendance; // 出勤系ならfalse(出勤扱い)、休暇系ならtrue(休み扱い)
+        } else {
+            // 休暇・出勤の明示的な設定がない場合
+            if (isHolidayOrClosed) {
+                isAbsent = true; // 休診日・祝日はデフォルトで「休み」扱い
+            } else {
+                isAbsent = false; // それ以外（日曜日含む）はデフォルトで「出勤」扱い
+            }
+        }
 
         if (!isAbsent) {
             // シフトに入っているか確認
