@@ -117,6 +117,8 @@ function openRoleMonthlyModal(year, month, role) {
                 let leaveBg = '#f1f5f9';
                 let leaveColor = '#333';
                 if (leaveVal === 'paid') { leaveText = '有給休暇'; leaveBg = '#fef3c7'; leaveColor = '#d97706'; }
+                else if (leaveVal === 'am-leave') { leaveText = '午前休'; leaveBg = '#fce7f3'; leaveColor = '#be185d'; }
+                else if (leaveVal === 'pm-leave') { leaveText = '午後休'; leaveBg = '#e0e7ff'; leaveColor = '#4338ca'; }
                 else if (leaveVal === 'happy') { leaveText = 'ハッピーマンデー'; leaveBg = '#e0e7ff'; leaveColor = '#4338ca'; }
                 else if (leaveVal === 'other-vibkyuu') { leaveText = '休暇'; leaveBg = '#f3f4f6'; leaveColor = '#4b5563'; }
                 else if (leaveVal === 'comz-vibshutu') { leaveText = '振出'; leaveBg = '#dcfce7'; leaveColor = '#15803d'; }

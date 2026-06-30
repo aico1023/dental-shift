@@ -93,8 +93,14 @@ function checkLeaveConflicts(weekKey, dayKey) {
             const staffIds = [sh.doctorId, ...(sh.daIds || []), ...(sh.dhIds || []), ...(sh.tcIds || []), ...(sh.dtIds || [])].filter(Boolean);
             staffIds.forEach(sid => {
                 const leaveType = getLeaveRecord(weekKey, sid, dayKey);
-                if (leaveType && leaveTypesToFlag.includes(leaveType)) {
-                    conflicts.add(sh.id);
+                if (leaveType) {
+                    if (leaveTypesToFlag.includes(leaveType)) {
+                        conflicts.add(sh.id);
+                    } else if (leaveType === 'am-leave') {
+                        if (sh.startSlot < 13 && sh.endSlot > 9) conflicts.add(sh.id);
+                    } else if (leaveType === 'pm-leave') {
+                        if (sh.startSlot < 20 && sh.endSlot > 14) conflicts.add(sh.id);
+                    }
                 }
             });
         });
@@ -102,12 +108,18 @@ function checkLeaveConflicts(weekKey, dayKey) {
 
     // 受付シフトもチェック
     const rc = getDayReception(weekKey, dayKey);
-    const rcStaff = [...rc.am, ...rc.pm];
+    const rcStaff = [...new Set([...rc.am, ...rc.pm])];
     const rcConflicts = new Set(); // staffId
     rcStaff.forEach(sid => {
         const leaveType = getLeaveRecord(weekKey, sid, dayKey);
-        if (leaveType && leaveTypesToFlag.includes(leaveType)) {
-            rcConflicts.add(sid);
+        if (leaveType) {
+            if (leaveTypesToFlag.includes(leaveType)) {
+                rcConflicts.add(sid);
+            } else if (leaveType === 'am-leave' && rc.am.includes(sid)) {
+                rcConflicts.add(sid);
+            } else if (leaveType === 'pm-leave' && rc.pm.includes(sid)) {
+                rcConflicts.add(sid);
+            }
         }
     });
 
@@ -133,7 +145,7 @@ function checkAttendanceRequirements(weekKey, dayKey) {
 
         const leaveType = getLeaveRecord(weekKey, s.id, dayKey);
         const leaveInfo = leaveType ? (typeof LEAVE_TYPES !== 'undefined' ? LEAVE_TYPES[leaveType] : null) : null;
-        const isAttendance = leaveType === 'working-day' || leaveType === 'comz-vibshutu' || leaveType === 'other-vibshutu';
+        const isAttendance = leaveType === 'working-day' || leaveType === 'comz-vibshutu' || leaveType === 'other-vibshutu' || leaveType === 'am-leave' || leaveType === 'pm-leave';
         
         let isAbsent;
         if (leaveType) {

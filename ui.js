@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // ui.js - モーダル・スタッフパネル・トースト・集計・その他UI
 // ============================================================
 
@@ -8,6 +8,8 @@ const LEAVE_TYPES = {
     'shift-off': { label: 'シフト休み', shortLabel: '', weeklyLabel: ' ', cls: 'leave-shiftoff', bg: 'rgba(156, 163, 175, 0.2)' },
     'normal-leave': { label: '通常休暇', shortLabel: '通常休暇', weeklyLabel: '休', cls: 'leave-normal', bg: 'rgba(59, 130, 246, 0.12)' },
     'paid': { label: '🏖️ 有給休暇', shortLabel: '🏖️ 有給', weeklyLabel: '🏖️有休', cls: 'leave-paid', bg: 'rgba(249,115,22,0.12)' },
+    'am-leave': { label: '🌅 午前休', shortLabel: '🌅 午前休', weeklyLabel: '🌅午前休', cls: 'leave-am', bg: 'rgba(244,114,182,0.12)' },
+    'pm-leave': { label: '🌇 午後休', shortLabel: '🌇 午後休', weeklyLabel: '🌇午後休', cls: 'leave-pm', bg: 'rgba(99,102,241,0.12)' },
     'happy': { label: '🎌 ハッピーマンデー', shortLabel: '🎌 HM', weeklyLabel: '🎌HM', cls: 'leave-happy', bg: 'rgba(139,92,246,0.12)' },
     'other-vibkyuu': { label: '😴 その他休暇', shortLabel: '😴 その他休暇', weeklyLabel: '😴休暇', cls: 'leave-vibkyuu', bg: 'rgba(6,182,212,0.12)' },
     'comz-vibshutu': { label: '🌳 コムズ振出', shortLabel: '🌳 コムズ振出', weeklyLabel: '🌳振出', cls: 'leave-comz', bg: 'rgba(16,185,129,0.12)' },
@@ -150,7 +152,7 @@ function renderStaffPanel() {
         const activeMembers = members.filter(s => {
             const leaveType = getLeaveRecord(wk, s.id, dk);
             const leaveInfo = leaveType ? LEAVE_TYPES[leaveType] : null;
-            const isAttendance = leaveType === 'working-day' || leaveType === 'comz-vibshutu' || leaveType === 'other-vibshutu';
+            const isAttendance = leaveType === 'working-day' || leaveType === 'comz-vibshutu' || leaveType === 'other-vibshutu' || leaveType === 'am-leave' || leaveType === 'pm-leave';
             const isAbsent = leaveInfo && !isAttendance;
             return !isAbsent;
         });
@@ -177,13 +179,13 @@ function renderStaffPanel() {
     const absentMembers = State.staff.filter(s => {
         const leaveType = getLeaveRecord(wk, s.id, dk);
         const leaveInfo = leaveType ? LEAVE_TYPES[leaveType] : null;
-        const isAttendance = leaveType === 'working-day' || leaveType === 'comz-vibshutu' || leaveType === 'other-vibshutu';
+        const isAttendance = leaveType === 'working-day' || leaveType === 'comz-vibshutu' || leaveType === 'other-vibshutu' || leaveType === 'am-leave' || leaveType === 'pm-leave';
         const isAbsent = leaveInfo && !isAttendance;
         return isAbsent;
     });
 
     // 休みの種類 > 職種 > スタッフ順 で並び替え
-    const leavePriority = { 'paid': 1, 'happy': 2, 'other-vibkyuu': 3, 'normal-leave': 4, 'shift-off': 5 };
+    const leavePriority = { 'paid': 1, 'am-leave': 1.5, 'pm-leave': 1.6, 'happy': 2, 'other-vibkyuu': 3, 'normal-leave': 4, 'shift-off': 5 };
     const rolePriority = { 'dr': 1, 'dh': 2, 'da': 3, 'dt': 4, 'reception': 5 };
     absentMembers.sort((a, b) => {
         const leaveA = getLeaveRecord(wk, a.id, dk);
